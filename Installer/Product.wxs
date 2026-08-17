@@ -1,0 +1,88 @@
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+     xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
+
+  <Package Name="ClamAV Guardian"
+           Manufacturer="ClamAV Guardian Project"
+           Version="1.2.0.0"
+           UpgradeCode="9cba3fd8-b496-4442-bf08-2589e7ef6f2c"
+           Compressed="yes"
+           Scope="perMachine">
+
+    <SummaryInformation Description="ClamAV Guardian Setup" />
+    <MajorUpgrade DowngradeErrorMessage="A newer version of ClamAV Guardian is already installed." />
+    <MediaTemplate EmbedCab="yes" />
+
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="INSTALLFOLDER" Name="ClamAV Guardian" />
+    </StandardDirectory>
+
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Directory Id="AppProgramMenuFolder" Name="ClamAV Guardian" />
+    </StandardDirectory>
+
+    <Feature Id="MainFeature" Title="ClamAV Guardian" Level="1">
+      <ComponentGroupRef Id="ProductComponents" />
+      <ComponentRef Id="StartMenuShortcutComponent" />
+      <ComponentRef Id="DesktopShortcutComponent" />
+    </Feature>
+
+    <ComponentGroup Id="ProductComponents" Directory="INSTALLFOLDER">
+      <Component Id="MainExecutable" Guid="8f3a2c1e-4b5d-4a6e-9c7f-1a2b3c4d5e6f">
+        <File Id="ClamAVGuardianExe"
+              Source="..\ClamAVGuardian\bin\Release\net8.0-windows\win-x64\publish\ClamAVGuardian.exe"
+              KeyPath="yes" />
+      </Component>
+
+      <Component Id="ServiceExecutable" Guid="4e1a7b2c-9d3f-4a5e-8b6c-2f1d3e4a5b6c">
+        <File Id="ClamAVGuardianServiceExe"
+              Source="..\ClamAVGuardian.Service\bin\Release\net8.0-windows\win-x64\publish\ClamAVGuardian.Service.exe"
+              KeyPath="yes" />
+        <ServiceInstall Id="ClamAVGuardianServiceInstall"
+                         Name="ClamAVGuardianService"
+                         DisplayName="ClamAV Guardian Service"
+                         Description="Runs ClamAV scanning, virus database updates, and real-time protection in the background."
+                         Type="ownProcess"
+                         Start="auto"
+                         Account="LocalSystem"
+                         ErrorControl="normal" />
+        <ServiceControl Id="ClamAVGuardianServiceControl"
+                         Name="ClamAVGuardianService"
+                         Start="install"
+                         Stop="both"
+                         Remove="uninstall"
+                         Wait="yes" />
+      </Component>
+    </ComponentGroup>
+
+    <Component Id="StartMenuShortcutComponent" Directory="AppProgramMenuFolder" Guid="6d2e9f4a-7c1b-4e3d-8a5f-2b3c4d5e6f7a">
+      <Shortcut Id="StartMenuShortcut"
+                Name="ClamAV Guardian"
+                Description="Manage ClamAV scanning, updates, and real-time protection"
+                Target="[INSTALLFOLDER]ClamAVGuardian.exe"
+                WorkingDirectory="INSTALLFOLDER" />
+      <RemoveFolder Id="RemoveAppProgramMenuFolder" On="uninstall" />
+      <RegistryValue Root="HKCU" Key="Software\ClamAVGuardian" Name="StartMenuShortcut" Type="integer" Value="1" KeyPath="yes" />
+    </Component>
+
+    <StandardDirectory Id="DesktopFolder">
+      <Component Id="DesktopShortcutComponent" Guid="1a9b8c7d-6e5f-4a3b-9c2d-1e0f3a4b5c6d">
+        <Shortcut Id="DesktopShortcut"
+                  Name="ClamAV Guardian"
+                  Description="Manage ClamAV scanning, updates, and real-time protection"
+                  Target="[INSTALLFOLDER]ClamAVGuardian.exe"
+                  WorkingDirectory="INSTALLFOLDER" />
+        <RegistryValue Root="HKCU" Key="Software\ClamAVGuardian" Name="DesktopShortcut" Type="integer" Value="1" KeyPath="yes" />
+      </Component>
+    </StandardDirectory>
+
+    <Icon Id="AppIcon.exe" SourceFile="..\ClamAVGuardian\bin\Release\net8.0-windows\win-x64\publish\ClamAVGuardian.exe" />
+    <Property Id="ARPPRODUCTICON" Value="AppIcon.exe" />
+    <Property Id="ARPHELPLINK" Value="https://www.clamav.net" />
+    <Property Id="ARPNOREPAIR" Value="yes" />
+
+    <ui:WixUI Id="WixUI_InstallDir" />
+    <WixVariable Id="WixUILicenseRtf" Value="License.rtf" />
+    <Property Id="WIXUI_INSTALLDIR" Value="INSTALLFOLDER" />
+
+  </Package>
+</Wix>

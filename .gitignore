@@ -1,0 +1,14 @@
+# Build output
+bin/
+obj/
+*.pdb
+*.wixpdb
+
+# Publish/installer artifacts — built locally and attached to GitHub Releases,
+# not committed to the repo
+**/publish/
+*.msi
+
+# User-specific / IDE
+.vs/
+*.user
