@@ -3,7 +3,7 @@
 
   <Package Name="ClamAV Guardian"
            Manufacturer="ClamAV Guardian Project"
-           Version="1.2.2.0"
+           Version="1.2.3.0"
            UpgradeCode="9cba3fd8-b496-4442-bf08-2589e7ef6f2c"
            Compressed="yes"
            Scope="perMachine">
