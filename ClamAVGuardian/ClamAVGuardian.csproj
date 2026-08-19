@@ -11,6 +11,7 @@
     <AssemblyName>ClamAVGuardian</AssemblyName>
     <RootNamespace>ClamAVGuardian</RootNamespace>
     <Version>1.2.2.0</Version>
+    <ApplicationIcon>Resources\AppIcon.ico</ApplicationIcon>
 
     <!-- Single-file, self-contained publish settings -->
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>

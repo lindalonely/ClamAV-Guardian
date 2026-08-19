@@ -1,5 +1,6 @@
 using System.Drawing;
 using System.Drawing.Drawing2D;
+using System.Windows.Forms;
 
 namespace ClamAVGuardian.Resources;
 
@@ -54,5 +55,12 @@ public static class IconFactory
         return Icon.FromHandle(hIcon);
     }
 
-    public static Icon CreateAppIcon() => CreateTrayIcon(TrayIconState.Protected);
+    /// <summary>
+    /// Pulls the icon straight from this exe's own embedded resource (ApplicationIcon in
+    /// the csproj), so the window/taskbar icon matches what Explorer and shortcuts show —
+    /// rather than the separately runtime-drawn tray icon, which only exists as a small
+    /// bitmap and was never embedded in the exe file itself.
+    /// </summary>
+    public static Icon CreateAppIcon() =>
+        Icon.ExtractAssociatedIcon(Application.ExecutablePath) ?? CreateTrayIcon(TrayIconState.Protected);
 }
