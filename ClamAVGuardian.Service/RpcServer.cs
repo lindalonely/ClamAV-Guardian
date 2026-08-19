@@ -33,6 +33,12 @@ public class RpcServer : IGuardianService
 
     public Task<ClamAvInstallation?> LocateClamAvAsync(string? configuredPath) => Task.FromResult(ClamAvLocator.TryLocate(configuredPath));
 
+    public async Task<InstallClamAvResult> InstallClamAvAsync()
+    {
+        var (success, message) = await _context.InstallClamAvAsync();
+        return new InstallClamAvResult { Success = success, Message = message };
+    }
+
     public async Task<ScanSummary> StartScanAsync(ScanRequest request, CancellationToken cancellationToken)
     {
         if (_context.ScanService == null || _context.Install == null)

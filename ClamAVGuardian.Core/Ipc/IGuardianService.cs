@@ -16,6 +16,7 @@ public interface IGuardianService
     Task<ClamAvInstallation?> GetCurrentInstallationAsync();
     Task<ClamAvInstallation?> ApplyClamAvPathAsync(string path);
     Task<ClamAvInstallation?> LocateClamAvAsync(string? configuredPath);
+    Task<InstallClamAvResult> InstallClamAvAsync();
 
     Task<ScanSummary> StartScanAsync(ScanRequest request, CancellationToken cancellationToken);
     Task CancelScanAsync();
@@ -61,4 +62,5 @@ public interface IGuardianClientCallbacks
     void OnLogLine(string line);
     void OnUpdateLogLine(string line);
     void OnUpdateStatusChanged(UpdateStatus status);
+    void OnClamAvInstallStatus(string message);
 }

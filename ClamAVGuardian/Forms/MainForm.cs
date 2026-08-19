@@ -63,6 +63,7 @@ public class MainForm : Form
 
     // Dashboard
     private Label _lblClamAvStatus = null!;
+    private Button _btnInstallClamAv = null!;
     private StatCard _cardProtection = null!;
     private StatCard _cardEngine = null!;
     private StatCard _cardDbVersion = null!;
@@ -270,6 +271,11 @@ public class MainForm : Form
         _client.LogLine += line => SafeInvoke(() => AppendActivity(line));
         _client.UpdateLogLine += line => SafeInvoke(() => _txtUpdateLog.AppendText(line + Environment.NewLine));
         _client.ConnectionStateChanged += connected => SafeInvoke(() => OnConnectionStateChanged(connected));
+        _client.ClamAvInstallStatus += msg => SafeInvoke(() =>
+        {
+            _lblClamAvStatus.Text = msg;
+            AppendActivity(msg);
+        });
 
         _lblClamAvStatus.Text = "Connecting to ClamAV Guardian service...";
         _lblClamAvStatus.ForeColor = Theme.TextSecondary;
@@ -332,12 +338,14 @@ public class MainForm : Form
 
         if (_install == null)
         {
-            _lblClamAvStatus.Text = "ClamAV not found. Set the install path in Settings to unlock scanning, updates, and real-time protection.";
+            _lblClamAvStatus.Text = "ClamAV not found. Install it automatically, or set the path manually in Settings.";
             _lblClamAvStatus.ForeColor = Theme.AccentAmber;
+            _btnInstallClamAv.Visible = true;
             SetProtectionCard("Not Configured", Theme.AccentAmber);
             return;
         }
 
+        _btnInstallClamAv.Visible = false;
         _lblClamAvStatus.Text = $"ClamAV found at {_install.InstallDir}";
         _lblClamAvStatus.ForeColor = Theme.AccentGreen;
 
@@ -468,15 +476,21 @@ public class MainForm : Form
 
         root.Controls.Add(PageHeading("Dashboard"));
 
+        var clamAvStatusRow = new FlowLayoutPanel { AutoSize = true, Margin = new Padding(0, 0, 0, 12) };
         _lblClamAvStatus = new Label
         {
             Text = "Locating ClamAV...",
             AutoSize = true,
             Font = Theme.FontBody,
             ForeColor = Theme.TextSecondary,
-            Margin = new Padding(0, 0, 0, 12),
+            Margin = new Padding(0, 4, 12, 0),
         };
-        root.Controls.Add(_lblClamAvStatus);
+        _btnInstallClamAv = new Button { Text = "Install ClamAV Automatically", Visible = false, AutoSize = true };
+        Theme.StylePrimaryButton(_btnInstallClamAv);
+        _btnInstallClamAv.Click += async (_, _) => await InstallClamAvAsync();
+        clamAvStatusRow.Controls.Add(_lblClamAvStatus);
+        clamAvStatusRow.Controls.Add(_btnInstallClamAv);
+        root.Controls.Add(clamAvStatusRow);
 
         var statsFlow = new FlowLayoutPanel { AutoSize = true, FlowDirection = FlowDirection.LeftToRight };
         _cardProtection = NewCard("Protection Status", "Checking...", Theme.AccentGray);
@@ -1148,6 +1162,38 @@ public class MainForm : Form
             _lblUpdateStatus.Text = "Downloading and installing update...";
             await _client.Service.ApplyAppUpdateAsync();
             _lblUpdateStatus.Text = "Update applied. The service will restart shortly.";
+        }
+    }
+
+    private async Task InstallClamAvAsync()
+    {
+        if (!_client.IsConnected)
+        {
+            MessageBox.Show("Not connected to the ClamAV Guardian service.", "ClamAV Guardian");
+            return;
+        }
+
+        _btnInstallClamAv.Enabled = false;
+        _lblClamAvStatus.Text = "Starting ClamAV install...";
+        _lblClamAvStatus.ForeColor = Theme.TextSecondary;
+
+        var result = await _client.Service.InstallClamAvAsync();
+
+        _btnInstallClamAv.Enabled = true;
+
+        if (result.Success)
+        {
+            _install = await _client.Service.GetCurrentInstallationAsync();
+            _btnInstallClamAv.Visible = _install == null;
+            _lblClamAvStatus.Text = _install != null ? $"ClamAV found at {_install.InstallDir}" : result.Message;
+            _lblClamAvStatus.ForeColor = _install != null ? Theme.AccentGreen : Theme.AccentAmber;
+            await RefreshUpdateStatusAsync();
+        }
+        else
+        {
+            _lblClamAvStatus.Text = $"Install failed: {result.Message}";
+            _lblClamAvStatus.ForeColor = Theme.AccentRed;
+            MessageBox.Show($"Failed to install ClamAV automatically: {result.Message}\n\nYou can still install it manually from clamav.net and point Settings at it.", "ClamAV Guardian", MessageBoxButtons.OK, MessageBoxIcon.Warning);
         }
     }
 

@@ -1,4 +1,5 @@
 using System;
+using System.Threading.Tasks;
 using ClamAVGuardian.Models;
 using ClamAVGuardian.Services;
 
@@ -24,6 +25,9 @@ public class GuardianContext
     public event Action<string>? RealTimeEngineStatus;
     public event Action<string>? LogLine;
     public event Action<string>? UpdateLogLine;
+    public event Action<string>? ClamAvInstallStatus;
+
+    private bool _clamAvInstallInProgress;
 
     public GuardianContext()
     {
@@ -53,6 +57,58 @@ public class GuardianContext
         }
 
         UpdateService?.StartFallbackTimer(Settings.UpdateCheckIntervalHours > 0 ? Settings.UpdateCheckIntervalHours : 2);
+    }
+
+    /// <summary>
+    /// Called once by the worker shortly after startup (fire-and-forget — download+install
+    /// can take a while and shouldn't block the service becoming responsive). No-ops if
+    /// ClamAV is already found or an install attempt is already running.
+    /// </summary>
+    public async Task AutoInstallClamAvIfMissingAsync()
+    {
+        if (Install != null || _clamAvInstallInProgress) return;
+        AppLogger.Info("ClamAV not found — attempting automatic install.");
+        await InstallClamAvAsync();
+    }
+
+    public async Task<(bool Success, string Message)> InstallClamAvAsync()
+    {
+        if (_clamAvInstallInProgress)
+        {
+            return (false, "An install is already in progress.");
+        }
+
+        _clamAvInstallInProgress = true;
+        void OnStatus(string message) => ClamAvInstallStatus?.Invoke(message);
+        ClamAvInstallerService.StatusChanged += OnStatus;
+
+        try
+        {
+            var (success, message) = await ClamAvInstallerService.DownloadAndInstallAsync();
+            if (success)
+            {
+                var candidate = ClamAvLocator.TryLocate(null);
+                if (candidate != null)
+                {
+                    Install = candidate;
+                    Settings.ClamAvInstallPath = candidate.InstallDir;
+                    SettingsManager.Save(Settings);
+                    WireUpInstallDependentServices();
+                    UpdateService?.StartFallbackTimer(Settings.UpdateCheckIntervalHours > 0 ? Settings.UpdateCheckIntervalHours : 2);
+                }
+                else
+                {
+                    AppLogger.Warn("ClamAV installer reported success but the engine still wasn't found afterward.");
+                }
+            }
+
+            return (success, message);
+        }
+        finally
+        {
+            ClamAvInstallerService.StatusChanged -= OnStatus;
+            _clamAvInstallInProgress = false;
+        }
     }
 
     public ClamAvInstallation? ApplyClamAvPath(string path)

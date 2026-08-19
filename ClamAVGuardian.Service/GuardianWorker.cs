@@ -22,6 +22,10 @@ public class GuardianWorker : BackgroundService
 
         _context.StartBackgroundOperations();
 
+        // Fire-and-forget: download+install ClamAV itself can take a while (~200MB) and
+        // shouldn't block the service becoming responsive over IPC. No-ops if already found.
+        _ = _context.AutoInstallClamAvIfMissingAsync();
+
         AppLogger.Info("ClamAV Guardian service ready.");
 
         try

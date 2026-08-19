@@ -27,6 +27,7 @@ public class GuardianServiceClient : IGuardianClientCallbacks, IDisposable
     public event Action<string>? LogLine;
     public event Action<string>? UpdateLogLine;
     public event Action<bool>? ConnectionStateChanged;
+    public event Action<string>? ClamAvInstallStatus;
 
     public bool IsConnected => _proxy != null;
 
@@ -101,6 +102,7 @@ public class GuardianServiceClient : IGuardianClientCallbacks, IDisposable
     public void OnLogLine(string line) => LogLine?.Invoke(line);
     public void OnUpdateLogLine(string line) => UpdateLogLine?.Invoke(line);
     public void OnUpdateStatusChanged(UpdateStatus status) { /* clients poll GetUpdateStatusAsync on demand today */ }
+    public void OnClamAvInstallStatus(string message) => ClamAvInstallStatus?.Invoke(message);
 
     public void Dispose()
     {

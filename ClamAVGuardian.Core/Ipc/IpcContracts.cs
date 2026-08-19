@@ -20,3 +20,9 @@ public class AppUpdateCheckResult
     public string? LatestVersion { get; set; }
     public string? ReleaseNotesUrl { get; set; }
 }
+
+public class InstallClamAvResult
+{
+    public bool Success { get; set; }
+    public string Message { get; set; } = string.Empty;
+}
