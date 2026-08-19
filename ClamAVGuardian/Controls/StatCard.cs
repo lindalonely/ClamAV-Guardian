@@ -10,6 +10,8 @@ public class StatCard : RoundedPanel
     private readonly Label _valueLabel;
     private readonly Label _subtitleLabel;
     private readonly Panel _accentBar;
+    private readonly PictureBox _iconBox;
+    private AppIcon _icon = AppIcon.Shield;
 
     public string TitleText
     {
@@ -33,6 +35,16 @@ public class StatCard : RoundedPanel
         }
     }
 
+    public AppIcon Icon
+    {
+        get => _icon;
+        set
+        {
+            _icon = value;
+            RefreshIcon();
+        }
+    }
+
     public Color AccentColor
     {
         get => _accentBar.BackColor;
@@ -40,7 +52,14 @@ public class StatCard : RoundedPanel
         {
             _accentBar.BackColor = value;
             _valueLabel.ForeColor = value;
+            RefreshIcon();
         }
+    }
+
+    private void RefreshIcon()
+    {
+        _iconBox.Image?.Dispose();
+        _iconBox.Image = IconSet.Render(_icon, 20, AccentColor);
     }
 
     public StatCard()
@@ -49,6 +68,15 @@ public class StatCard : RoundedPanel
         Size = new Size(220, 110);
 
         _accentBar = new Panel { Dock = DockStyle.Left, Width = 4, BackColor = Theme.AccentBlue };
+
+        _iconBox = new PictureBox
+        {
+            Size = new Size(20, 20),
+            Anchor = AnchorStyles.Top | AnchorStyles.Right,
+            Location = new Point(Size.Width - 16 - 20, 14),
+            BackColor = Color.Transparent,
+            SizeMode = PictureBoxSizeMode.CenterImage,
+        };
 
         _titleLabel = new Label
         {
@@ -87,12 +115,14 @@ public class StatCard : RoundedPanel
             Visible = false,
         };
 
-        var contentPanel = new Panel { Dock = DockStyle.Fill, Padding = new Padding(12, 0, 0, 0) };
+        var contentPanel = new Panel { Dock = DockStyle.Fill, Padding = new Padding(12, 0, 26, 0) };
         contentPanel.Controls.Add(_subtitleLabel);
         contentPanel.Controls.Add(_valueLabel);
         contentPanel.Controls.Add(_titleLabel);
 
         Controls.Add(contentPanel);
         Controls.Add(_accentBar);
+        Controls.Add(_iconBox);
+        RefreshIcon();
     }
 }

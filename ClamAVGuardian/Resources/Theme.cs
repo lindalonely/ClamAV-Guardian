@@ -67,6 +67,33 @@ public static class Theme
         button.Height = Math.Max(button.Height, 34);
     }
 
+    /// <summary>
+    /// Attaches a small flat vector icon (see IconSet) to a button that's already been
+    /// styled via StylePrimaryButton/StyleSecondaryButton/StyleDangerButton, so the icon
+    /// color matches the button's existing text color.
+    /// </summary>
+    public static void SetIcon(Button button, AppIcon icon)
+    {
+        // TextImageRelation places the image and text flush against each other with no
+        // built-in gap, so the spacing has to be baked into the bitmap itself (transparent
+        // padding on the right) rather than relying on Button.Padding.
+        const int iconSize = 16;
+        const int gap = 6;
+        var bmp = new Bitmap(iconSize + gap, iconSize);
+        using (var g = System.Drawing.Graphics.FromImage(bmp))
+        {
+            g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+            IconSet.Draw(g, icon, new RectangleF(0, 0, iconSize, iconSize), button.ForeColor);
+        }
+
+        button.Image?.Dispose();
+        button.Image = bmp;
+        button.ImageAlign = ContentAlignment.MiddleLeft;
+        button.TextImageRelation = TextImageRelation.ImageBeforeText;
+        button.TextAlign = ContentAlignment.MiddleCenter;
+        button.Padding = new Padding(8, 0, 8, 0);
+    }
+
     public static void StyleListView(ListView lv)
     {
         lv.BorderStyle = BorderStyle.None;

@@ -10,6 +10,7 @@ public class SidebarNavButton : Panel
 {
     private bool _selected;
     private bool _hover;
+    private readonly AppIcon _icon;
 
     public event EventHandler? Activated;
 
@@ -33,8 +34,9 @@ public class SidebarNavButton : Panel
         }
     }
 
-    public SidebarNavButton(string text)
+    public SidebarNavButton(string text, AppIcon icon)
     {
+        _icon = icon;
         SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.UserPaint | ControlStyles.ResizeRedraw | ControlStyles.Selectable, true);
         Height = 42;
         Dock = DockStyle.Top;
@@ -46,7 +48,7 @@ public class SidebarNavButton : Panel
             Text = text,
             Dock = DockStyle.Fill,
             TextAlign = ContentAlignment.MiddleLeft,
-            Padding = new Padding(24, 0, 0, 0),
+            Padding = new Padding(52, 0, 0, 0),
             ForeColor = Theme.SidebarText,
             BackColor = Color.Transparent,
             Font = Theme.FontNav,
@@ -74,6 +76,10 @@ public class SidebarNavButton : Panel
             using var accentBrush = new SolidBrush(Theme.AccentBlue);
             e.Graphics.FillRectangle(accentBrush, 0, 0, 3, Height);
         }
+
+        var iconColor = _selected ? Theme.SidebarTextActive : Theme.SidebarText;
+        var iconSize = 18f;
+        IconSet.Draw(e.Graphics, _icon, new RectangleF(20, (Height - iconSize) / 2f, iconSize, iconSize), iconColor);
 
         base.OnPaint(e);
     }

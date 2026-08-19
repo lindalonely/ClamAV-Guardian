@@ -179,13 +179,13 @@ public class MainForm : Form
     private void BuildTrayIcon()
     {
         var menu = new ContextMenuStrip();
-        menu.Items.Add("Open Dashboard", null, (_, _) => ShowAndFocus());
-        menu.Items.Add("Scan Now", null, async (_, _) => { ShowAndFocus(); await StartScanAsync(); });
-        menu.Items.Add("Update Now", null, async (_, _) => await RunUpdateNowAsync());
+        menu.Items.Add("Open Dashboard", IconSet.Render(AppIcon.Home, 16, Theme.TextPrimary), (_, _) => ShowAndFocus());
+        menu.Items.Add("Scan Now", IconSet.Render(AppIcon.Search, 16, Theme.TextPrimary), async (_, _) => { ShowAndFocus(); await StartScanAsync(); });
+        menu.Items.Add("Update Now", IconSet.Render(AppIcon.Refresh, 16, Theme.TextPrimary), async (_, _) => await RunUpdateNowAsync());
         menu.Items.Add(new ToolStripSeparator());
-        menu.Items.Add("Pause Real-Time Protection", null, async (_, _) => await ToggleRealTimeAsync(false));
+        menu.Items.Add("Pause Real-Time Protection", IconSet.Render(AppIcon.Shield, 16, Theme.TextPrimary), async (_, _) => await ToggleRealTimeAsync(false));
         menu.Items.Add(new ToolStripSeparator());
-        menu.Items.Add("Exit", null, (_, _) => { _isExiting = true; Close(); });
+        menu.Items.Add("Exit", IconSet.Render(AppIcon.Stop, 16, Theme.TextPrimary), (_, _) => { _isExiting = true; Close(); });
 
         _trayIcon = new NotifyIcon
         {
@@ -376,13 +376,13 @@ public class MainForm : Form
         Controls.Add(_contentHost);
         Controls.Add(sidebar);
 
-        AddPage("Dashboard", BuildDashboardPage(), selectFirst: true);
-        AddPage("Scan", BuildScanPage());
-        AddPage("Real-Time Protection", BuildRealTimePage());
-        AddPage("Quarantine", BuildQuarantinePage());
-        AddPage("Updates", BuildUpdatesPage());
-        AddPage("Logs", BuildLogsPage());
-        AddPage("Settings", BuildSettingsPage());
+        AddPage("Dashboard", AppIcon.Home, BuildDashboardPage(), selectFirst: true);
+        AddPage("Scan", AppIcon.Search, BuildScanPage());
+        AddPage("Real-Time Protection", AppIcon.Shield, BuildRealTimePage());
+        AddPage("Quarantine", AppIcon.Lock, BuildQuarantinePage());
+        AddPage("Updates", AppIcon.Refresh, BuildUpdatesPage());
+        AddPage("Logs", AppIcon.Document, BuildLogsPage());
+        AddPage("Settings", AppIcon.Gear, BuildSettingsPage());
     }
 
     private Panel BuildSidebar()
@@ -411,7 +411,7 @@ public class MainForm : Form
         return sidebar;
     }
 
-    private void AddPage(string title, Panel page, bool selectFirst = false)
+    private void AddPage(string title, AppIcon icon, Panel page, bool selectFirst = false)
     {
         page.Dock = DockStyle.Fill;
         page.Visible = false;
@@ -420,7 +420,7 @@ public class MainForm : Form
         var sidebar = Controls.OfType<Panel>().First(p => p.BackColor == Theme.SidebarBg && p.Dock == DockStyle.Left);
         var navContainer = (Panel)sidebar.Tag!;
 
-        var navButton = new SidebarNavButton(title);
+        var navButton = new SidebarNavButton(title, icon);
         navButton.Activated += (_, _) => SelectPage(navButton);
         navContainer.Controls.Add(navButton);
         navContainer.Controls.SetChildIndex(navButton, navContainer.Controls.Count - 1);
@@ -488,6 +488,7 @@ public class MainForm : Form
         };
         _btnInstallClamAv = new Button { Text = "Install ClamAV Automatically", Visible = false, AutoSize = true };
         Theme.StylePrimaryButton(_btnInstallClamAv);
+        Theme.SetIcon(_btnInstallClamAv, AppIcon.Download);
         _btnInstallClamAv.Click += async (_, _) => await InstallClamAvAsync();
         clamAvStatusRow.Controls.Add(_lblClamAvStatus);
         clamAvStatusRow.Controls.Add(_btnInstallClamAv);
@@ -504,13 +505,13 @@ public class MainForm : Form
         root.Controls.Add(_clamAvInstallProgressBar);
 
         var statsFlow = new FlowLayoutPanel { AutoSize = true, FlowDirection = FlowDirection.LeftToRight };
-        _cardProtection = NewCard("Protection Status", "Checking...", Theme.AccentGray);
-        _cardEngine = NewCard("Real-Time Engine", "Inactive", Theme.AccentGray, "Not running");
-        _cardDbVersion = NewCard("Database Version", "Unknown", Theme.AccentBlue);
-        _cardLastUpdate = NewCard("Last Update", "Never", Theme.AccentBlue);
-        _cardLastScan = NewCard("Last Scan", "Never run", Theme.AccentBlue);
-        _cardQuarantine = NewCard("Quarantined Items", "0", Theme.AccentAmber);
-        _cardThreatsSession = NewCard("Threats This Session", "0", Theme.AccentGreen, "No threats detected");
+        _cardProtection = NewCard("Protection Status", "Checking...", Theme.AccentGray, AppIcon.Shield);
+        _cardEngine = NewCard("Real-Time Engine", "Inactive", Theme.AccentGray, AppIcon.Search, "Not running");
+        _cardDbVersion = NewCard("Database Version", "Unknown", Theme.AccentBlue, AppIcon.Database);
+        _cardLastUpdate = NewCard("Last Update", "Never", Theme.AccentBlue, AppIcon.Clock);
+        _cardLastScan = NewCard("Last Scan", "Never run", Theme.AccentBlue, AppIcon.Search);
+        _cardQuarantine = NewCard("Quarantined Items", "0", Theme.AccentAmber, AppIcon.Lock);
+        _cardThreatsSession = NewCard("Threats This Session", "0", Theme.AccentGreen, AppIcon.Warning, "No threats detected");
 
         foreach (var card in new[] { _cardProtection, _cardEngine, _cardDbVersion, _cardLastUpdate, _cardLastScan, _cardQuarantine, _cardThreatsSession })
         {
@@ -524,6 +525,8 @@ public class MainForm : Form
         var btnUpdateNow = new Button { Text = "Update Now", Width = 150, Margin = new Padding(12, 0, 0, 0) };
         Theme.StylePrimaryButton(btnScanNow);
         Theme.StyleSecondaryButton(btnUpdateNow);
+        Theme.SetIcon(btnScanNow, AppIcon.Search);
+        Theme.SetIcon(btnUpdateNow, AppIcon.Refresh);
         btnScanNow.Click += async (_, _) => { SelectPage(_navButtons[1]); await StartScanAsync(); };
         btnUpdateNow.Click += async (_, _) => await RunUpdateNowAsync();
         actionsFlow.Controls.Add(btnScanNow);
@@ -581,9 +584,9 @@ public class MainForm : Form
         listView.HandleCreated += (_, _) => Resize();
     }
 
-    private static StatCard NewCard(string title, string value, Color accent, string? subtitle = null)
+    private static StatCard NewCard(string title, string value, Color accent, AppIcon icon, string? subtitle = null)
     {
-        var card = new StatCard { TitleText = title, ValueText = value, AccentColor = accent };
+        var card = new StatCard { TitleText = title, ValueText = value, AccentColor = accent, Icon = icon };
         if (subtitle != null) card.SubtitleText = subtitle;
         return card;
     }
@@ -616,6 +619,7 @@ public class MainForm : Form
         Theme.StyleTextBox(_txtCustomPath);
         var btnBrowse = new Button { Text = "Browse...", Margin = new Padding(6, 0, 0, 0) };
         Theme.StyleSecondaryButton(btnBrowse);
+        Theme.SetIcon(btnBrowse, AppIcon.Folder);
         btnBrowse.Click += (_, _) =>
         {
             using var dlg = new FolderBrowserDialog();
@@ -636,6 +640,8 @@ public class MainForm : Form
         _btnCancelScan = new Button { Text = "Cancel", Width = 100, Enabled = false, Margin = new Padding(8, 0, 0, 0) };
         Theme.StylePrimaryButton(_btnStartScan);
         Theme.StyleSecondaryButton(_btnCancelScan);
+        Theme.SetIcon(_btnStartScan, AppIcon.Play);
+        Theme.SetIcon(_btnCancelScan, AppIcon.Stop);
         _btnStartScan.Click += async (_, _) => await StartScanAsync();
         _btnCancelScan.Click += async (_, _) =>
         {
@@ -661,10 +667,10 @@ public class MainForm : Form
         actionPanel.Controls.Add(_cmbAfterScanAction);
 
         var statsFlow = new FlowLayoutPanel { AutoSize = true, FlowDirection = FlowDirection.LeftToRight, Margin = new Padding(0, 0, 0, 8) };
-        _scanCardFiles = NewCard("Files Scanned", "0", Theme.AccentBlue);
-        _scanCardInfected = NewCard("Infected", "0", Theme.AccentGreen);
-        _scanCardErrors = NewCard("Errors", "0", Theme.AccentGray);
-        _scanCardDuration = NewCard("Duration", "00:00", Theme.AccentBlue);
+        _scanCardFiles = NewCard("Files Scanned", "0", Theme.AccentBlue, AppIcon.Document);
+        _scanCardInfected = NewCard("Infected", "0", Theme.AccentGreen, AppIcon.Warning);
+        _scanCardErrors = NewCard("Errors", "0", Theme.AccentGray, AppIcon.Warning);
+        _scanCardDuration = NewCard("Duration", "00:00", Theme.AccentBlue, AppIcon.Clock);
         foreach (var card in new[] { _scanCardFiles, _scanCardInfected, _scanCardErrors, _scanCardDuration })
         {
             card.Size = new Size(180, 90);
@@ -685,6 +691,7 @@ public class MainForm : Form
         _lblScanBanner = new Label { Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft, Font = Theme.FontBodyBold, BackColor = Color.Transparent };
         _btnQuarantineAllInfected = new Button { Text = "Quarantine All Infected", Anchor = AnchorStyles.Right, Width = 190 };
         Theme.StyleDangerButton(_btnQuarantineAllInfected);
+        Theme.SetIcon(_btnQuarantineAllInfected, AppIcon.Lock);
         _btnQuarantineAllInfected.Click += async (_, _) => await QuarantineAllInfectedScanResultsAsync();
         bannerLayout.Controls.Add(_lblScanBanner, 0, 0);
         bannerLayout.Controls.Add(_btnQuarantineAllInfected, 1, 0);
@@ -753,6 +760,8 @@ public class MainForm : Form
         var btnRemoveFolder = new Button { Text = "Remove Selected", Margin = new Padding(8, 0, 0, 0) };
         Theme.StyleSecondaryButton(btnAddFolder);
         Theme.StyleSecondaryButton(btnRemoveFolder);
+        Theme.SetIcon(btnAddFolder, AppIcon.Plus);
+        Theme.SetIcon(btnRemoveFolder, AppIcon.Trash);
         btnAddFolder.Click += async (_, _) =>
         {
             using var dlg = new FolderBrowserDialog();
@@ -822,6 +831,10 @@ public class MainForm : Form
         Theme.StyleDangerButton(btnDelete);
         Theme.StyleDangerButton(btnDeleteAll);
         Theme.StyleSecondaryButton(btnRefresh);
+        Theme.SetIcon(btnRestore, AppIcon.Undo);
+        Theme.SetIcon(btnDelete, AppIcon.Trash);
+        Theme.SetIcon(btnDeleteAll, AppIcon.Trash);
+        Theme.SetIcon(btnRefresh, AppIcon.Refresh);
 
         btnRestore.Click += async (_, _) =>
         {
@@ -883,9 +896,9 @@ public class MainForm : Form
         root.Controls.Add(PageHeading("Updates"));
 
         var statsFlow = new FlowLayoutPanel { AutoSize = true, FlowDirection = FlowDirection.LeftToRight, Margin = new Padding(0, 8, 0, 8) };
-        _cardServiceState = NewCard("FreshClam Service", "Unknown", Theme.AccentGray);
-        _cardDbVersionUpd = NewCard("Database Version", "Unknown", Theme.AccentBlue);
-        _cardLastUpdateUpd = NewCard("Last Update", "Never", Theme.AccentBlue);
+        _cardServiceState = NewCard("FreshClam Service", "Unknown", Theme.AccentGray, AppIcon.Refresh);
+        _cardDbVersionUpd = NewCard("Database Version", "Unknown", Theme.AccentBlue, AppIcon.Database);
+        _cardLastUpdateUpd = NewCard("Last Update", "Never", Theme.AccentBlue, AppIcon.Clock);
         foreach (var card in new[] { _cardServiceState, _cardDbVersionUpd, _cardLastUpdateUpd })
         {
             card.Size = new Size(220, 110);
@@ -898,6 +911,7 @@ public class MainForm : Form
         _numCheckInterval = new NumericUpDown { Minimum = 1, Maximum = 24, Value = 2, Width = 60 };
         var btnSaveInterval = new Button { Text = "Save Interval", Margin = new Padding(8, 0, 0, 0) };
         Theme.StyleSecondaryButton(btnSaveInterval);
+        Theme.SetIcon(btnSaveInterval, AppIcon.Save);
         btnSaveInterval.Click += async (_, _) =>
         {
             if (!_client.IsConnected) return;
@@ -914,6 +928,9 @@ public class MainForm : Form
         Theme.StylePrimaryButton(btnUpdateNow);
         Theme.StyleSecondaryButton(btnStartService);
         Theme.StyleSecondaryButton(btnStopService);
+        Theme.SetIcon(btnUpdateNow, AppIcon.Refresh);
+        Theme.SetIcon(btnStartService, AppIcon.Play);
+        Theme.SetIcon(btnStopService, AppIcon.Stop);
         btnUpdateNow.Click += async (_, _) => await RunUpdateNowAsync();
         btnStartService.Click += async (_, _) => { if (_client.IsConnected) await _client.Service.StartFreshClamServiceAsync(); await RefreshUpdateStatusAsync(); };
         btnStopService.Click += async (_, _) => { if (_client.IsConnected) await _client.Service.StopFreshClamServiceAsync(); await RefreshUpdateStatusAsync(); };
@@ -955,6 +972,7 @@ public class MainForm : Form
         _cmbLogSource.SelectedIndex = 0;
         var btnRefreshLog = new Button { Text = "Refresh", Margin = new Padding(8, 0, 0, 0) };
         Theme.StyleSecondaryButton(btnRefreshLog);
+        Theme.SetIcon(btnRefreshLog, AppIcon.Refresh);
         btnRefreshLog.Click += async (_, _) => await RefreshLogViewerAsync();
         _cmbLogSource.SelectedIndexChanged += async (_, _) => await RefreshLogViewerAsync();
 
@@ -1001,6 +1019,9 @@ public class MainForm : Form
         Theme.StyleSecondaryButton(btnBrowseClamAv);
         Theme.StyleSecondaryButton(btnAutoDetect);
         Theme.StylePrimaryButton(btnApplyClamAv);
+        Theme.SetIcon(btnBrowseClamAv, AppIcon.Folder);
+        Theme.SetIcon(btnAutoDetect, AppIcon.Search);
+        Theme.SetIcon(btnApplyClamAv, AppIcon.Save);
         btnBrowseClamAv.Click += (_, _) =>
         {
             using var dlg = new FolderBrowserDialog();
@@ -1076,6 +1097,8 @@ public class MainForm : Form
         var btnRemoveExclusion = new Button { Text = "Remove Selected", Margin = new Padding(8, 0, 0, 0) };
         Theme.StyleSecondaryButton(btnAddExclusion);
         Theme.StyleSecondaryButton(btnRemoveExclusion);
+        Theme.SetIcon(btnAddExclusion, AppIcon.Plus);
+        Theme.SetIcon(btnRemoveExclusion, AppIcon.Trash);
         btnAddExclusion.Click += async (_, _) =>
         {
             using var dlg = new FolderBrowserDialog();
@@ -1118,6 +1141,7 @@ public class MainForm : Form
         };
         var btnCheckForUpdates = new Button { Text = "Check for Updates" };
         Theme.StyleSecondaryButton(btnCheckForUpdates);
+        Theme.SetIcon(btnCheckForUpdates, AppIcon.Refresh);
         btnCheckForUpdates.Click += async (_, _) => await CheckForUpdatesAsync();
         updateRow.Controls.Add(_lblUpdateStatus);
         updateRow.Controls.Add(btnCheckForUpdates);
