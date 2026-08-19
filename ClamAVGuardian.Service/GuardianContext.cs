@@ -1,5 +1,6 @@
 using System;
 using System.Threading.Tasks;
+using ClamAVGuardian.Ipc;
 using ClamAVGuardian.Models;
 using ClamAVGuardian.Services;
 
@@ -25,7 +26,8 @@ public class GuardianContext
     public event Action<string>? RealTimeEngineStatus;
     public event Action<string>? LogLine;
     public event Action<string>? UpdateLogLine;
-    public event Action<string>? ClamAvInstallStatus;
+    public event Action<DownloadProgress>? ClamAvInstallProgress;
+    public event Action<DownloadProgress>? AppUpdateProgress;
 
     private bool _clamAvInstallInProgress;
 
@@ -36,6 +38,7 @@ public class GuardianContext
             string.IsNullOrWhiteSpace(Settings.QuarantinePath) ? AppSettings.DefaultQuarantinePath : Settings.QuarantinePath);
 
         AppLogger.LineWritten += line => LogLine?.Invoke(line);
+        SelfUpdateService.ProgressChanged += progress => AppUpdateProgress?.Invoke(progress);
 
         Install = ClamAvLocator.TryLocate(Settings.ClamAvInstallPath);
         if (Install != null)
@@ -79,8 +82,8 @@ public class GuardianContext
         }
 
         _clamAvInstallInProgress = true;
-        void OnStatus(string message) => ClamAvInstallStatus?.Invoke(message);
-        ClamAvInstallerService.StatusChanged += OnStatus;
+        void OnProgress(DownloadProgress progress) => ClamAvInstallProgress?.Invoke(progress);
+        ClamAvInstallerService.ProgressChanged += OnProgress;
 
         try
         {
@@ -106,7 +109,7 @@ public class GuardianContext
         }
         finally
         {
-            ClamAvInstallerService.StatusChanged -= OnStatus;
+            ClamAvInstallerService.ProgressChanged -= OnProgress;
             _clamAvInstallInProgress = false;
         }
     }

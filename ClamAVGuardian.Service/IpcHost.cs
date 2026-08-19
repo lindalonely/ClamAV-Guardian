@@ -38,7 +38,8 @@ public class IpcHost : IDisposable
         _context.RealTimeEngineStatus += msg => Broadcast(cb => cb.OnRealTimeEngineStatus(msg));
         _context.LogLine += line => Broadcast(cb => cb.OnLogLine(line));
         _context.UpdateLogLine += line => Broadcast(cb => cb.OnUpdateLogLine(line));
-        _context.ClamAvInstallStatus += msg => Broadcast(cb => cb.OnClamAvInstallStatus(msg));
+        _context.ClamAvInstallProgress += progress => Broadcast(cb => cb.OnClamAvInstallProgress(progress));
+        _context.AppUpdateProgress += progress => Broadcast(cb => cb.OnAppUpdateProgress(progress));
     }
 
     public void Start()

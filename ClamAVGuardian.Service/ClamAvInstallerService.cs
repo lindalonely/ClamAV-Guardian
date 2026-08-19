@@ -4,6 +4,7 @@ using System.IO;
 using System.Net.Http;
 using System.Text.Json;
 using System.Threading.Tasks;
+using ClamAVGuardian.Ipc;
 using ClamAVGuardian.Services;
 
 namespace ClamAVGuardian.Service;
@@ -26,7 +27,7 @@ public static class ClamAvInstallerService
     private const string DownloadUrlTemplate = "https://www.clamav.net/downloads/production/clamav-{0}.win.x64.msi";
     private const long MinimumPlausibleInstallerBytes = 50_000_000; // real installer is ~200MB; guards against a truncated/error-page download
 
-    public static event Action<string>? StatusChanged;
+    public static event Action<DownloadProgress>? ProgressChanged;
 
     private static readonly HttpClient Http = CreateHttpClient();
 
@@ -41,12 +42,14 @@ public static class ClamAvInstallerService
     public static async Task<(bool Success, string Message)> DownloadAndInstallAsync()
     {
         string? msiPath = null;
+        string? version = null;
         try
         {
-            Report("Checking the latest ClamAV version...");
-            var version = await GetLatestVersionAsync();
+            Report(DownloadStage.Checking, "Checking the latest ClamAV version...", version);
+            version = await GetLatestVersionAsync();
             if (version == null)
             {
+                Report(DownloadStage.Failed, "Could not determine the latest ClamAV version.", null);
                 return (false, "Could not determine the latest ClamAV version.");
             }
 
@@ -55,28 +58,50 @@ public static class ClamAvInstallerService
             Directory.CreateDirectory(tempDir);
             msiPath = Path.Combine(tempDir, $"clamav-{version}.win.x64.msi");
 
-            Report($"Downloading ClamAV {version}...");
             AppLogger.Info($"Downloading ClamAV installer from '{downloadUrl}'.");
+            Report(DownloadStage.Downloading, $"Downloading ClamAV {version}...", version);
 
             using (var response = await Http.GetAsync(downloadUrl, HttpCompletionOption.ResponseHeadersRead))
             {
                 if (!response.IsSuccessStatusCode)
                 {
+                    Report(DownloadStage.Failed, $"Download failed: HTTP {(int)response.StatusCode}.", version);
                     return (false, $"Download failed: HTTP {(int)response.StatusCode}.");
                 }
 
+                var totalBytes = response.Content.Headers.ContentLength ?? 0;
+                await using var httpStream = await response.Content.ReadAsStreamAsync();
                 await using var fileStream = File.Create(msiPath);
-                await response.Content.CopyToAsync(fileStream);
+
+                var buffer = new byte[81920];
+                long bytesReceived = 0;
+                var lastReport = DateTime.MinValue;
+                int read;
+                while ((read = await httpStream.ReadAsync(buffer)) > 0)
+                {
+                    await fileStream.WriteAsync(buffer.AsMemory(0, read));
+                    bytesReceived += read;
+
+                    var now = DateTime.UtcNow;
+                    if (now - lastReport > TimeSpan.FromMilliseconds(200))
+                    {
+                        lastReport = now;
+                        Report(DownloadStage.Downloading, $"Downloading ClamAV {version}...", version, bytesReceived, totalBytes);
+                    }
+                }
+
+                Report(DownloadStage.Downloading, $"Downloading ClamAV {version}...", version, bytesReceived, totalBytes);
             }
 
             var fileInfo = new FileInfo(msiPath);
             if (fileInfo.Length < MinimumPlausibleInstallerBytes)
             {
                 AppLogger.Error($"Downloaded ClamAV installer was only {fileInfo.Length} bytes — too small to be genuine; aborting.");
+                Report(DownloadStage.Failed, "Downloaded file looked too small to be a valid installer; aborting.", version);
                 return (false, "Downloaded file looked too small to be a valid installer; aborting.");
             }
 
-            Report("Installing ClamAV (this can take a minute)...");
+            Report(DownloadStage.Installing, "Installing ClamAV (this can take a minute)...", version);
             AppLogger.Info($"Installing ClamAV silently from '{msiPath}'.");
 
             var psi = new ProcessStartInfo
@@ -90,6 +115,7 @@ public static class ClamAvInstallerService
             using var process = Process.Start(psi);
             if (process == null)
             {
+                Report(DownloadStage.Failed, "Failed to start the ClamAV installer process.", version);
                 return (false, "Failed to start the ClamAV installer process.");
             }
 
@@ -98,16 +124,18 @@ public static class ClamAvInstallerService
             // 3010 = success, reboot required (harmless here — ClamAV doesn't need one to work).
             if (process.ExitCode != 0 && process.ExitCode != 3010)
             {
+                Report(DownloadStage.Failed, $"ClamAV installer exited with code {process.ExitCode}.", version);
                 return (false, $"ClamAV installer exited with code {process.ExitCode}.");
             }
 
-            Report("ClamAV installed.");
+            Report(DownloadStage.Done, "ClamAV installed.", version);
             AppLogger.Info($"ClamAV {version} installed successfully.");
             return (true, $"ClamAV {version} installed successfully.");
         }
         catch (Exception ex)
         {
             AppLogger.Error("Failed to auto-install ClamAV", ex);
+            Report(DownloadStage.Failed, $"Failed to install ClamAV: {ex.Message}", version);
             return (false, $"Failed to install ClamAV: {ex.Message}");
         }
         finally
@@ -131,10 +159,17 @@ public static class ClamAvInstallerService
         return tagName.StartsWith(prefix, StringComparison.OrdinalIgnoreCase) ? tagName[prefix.Length..] : tagName;
     }
 
-    private static void Report(string message)
+    private static void Report(DownloadStage stage, string message, string? version, long bytesReceived = 0, long totalBytes = 0)
     {
         AppLogger.Info(message);
-        StatusChanged?.Invoke(message);
+        ProgressChanged?.Invoke(new DownloadProgress
+        {
+            Stage = stage,
+            Message = message,
+            TargetVersion = version,
+            BytesReceived = bytesReceived,
+            TotalBytes = totalBytes,
+        });
     }
 
     private static void TryDeleteFile(string path)

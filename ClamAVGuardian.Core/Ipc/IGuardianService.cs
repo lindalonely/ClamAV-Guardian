@@ -62,5 +62,6 @@ public interface IGuardianClientCallbacks
     void OnLogLine(string line);
     void OnUpdateLogLine(string line);
     void OnUpdateStatusChanged(UpdateStatus status);
-    void OnClamAvInstallStatus(string message);
+    void OnClamAvInstallProgress(DownloadProgress progress);
+    void OnAppUpdateProgress(DownloadProgress progress);
 }

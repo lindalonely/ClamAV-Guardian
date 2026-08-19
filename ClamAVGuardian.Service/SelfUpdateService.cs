@@ -22,6 +22,8 @@ public static class SelfUpdateService
 {
     private const string ReleasesApiUrl = "https://api.github.com/repos/lindalonely/ClamAV-Guardian/releases/latest";
 
+    public static event Action<DownloadProgress>? ProgressChanged;
+
     private static readonly HttpClient Http = CreateHttpClient();
 
     private static HttpClient CreateHttpClient()
@@ -64,25 +66,32 @@ public static class SelfUpdateService
     public static async Task ApplyPendingUpdateAsync()
     {
         string? msiPath = null;
+        var currentVersion = (Assembly.GetExecutingAssembly().GetName().Version ?? new Version(0, 0, 0, 0)).ToString(4);
+        string? targetVersion = null;
         try
         {
+            Report(DownloadStage.Checking, "Checking for the latest release...", currentVersion, null);
             var release = await FetchLatestReleaseAsync();
             if (release == null || release.Value.MsiUrl == null)
             {
                 AppLogger.Warn("No MSI asset found in latest release; cannot self-update.");
+                Report(DownloadStage.Failed, "No update package found.", currentVersion, null);
                 return;
             }
+
+            targetVersion = release.Value.Version;
 
             var tempDir = Path.Combine(Path.GetTempPath(), "ClamAVGuardianUpdate");
             Directory.CreateDirectory(tempDir);
             msiPath = Path.Combine(tempDir, release.Value.MsiName!);
 
             AppLogger.Info($"Downloading update from '{release.Value.MsiUrl}'.");
-            var msiBytes = await Http.GetByteArrayAsync(release.Value.MsiUrl);
-            await File.WriteAllBytesAsync(msiPath, msiBytes);
+            Report(DownloadStage.Downloading, $"Downloading v{targetVersion}...", currentVersion, targetVersion);
+            await DownloadWithProgressAsync(release.Value.MsiUrl, msiPath, currentVersion, targetVersion);
 
             if (release.Value.ChecksumUrl != null)
             {
+                Report(DownloadStage.Verifying, "Verifying download...", currentVersion, targetVersion);
                 var expectedChecksumText = await Http.GetStringAsync(release.Value.ChecksumUrl);
                 var expectedHash = expectedChecksumText.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries)
                     .FirstOrDefault()?.Trim().ToLowerInvariant();
@@ -94,6 +103,7 @@ public static class SelfUpdateService
                 if (string.IsNullOrEmpty(expectedHash) || actualHash != expectedHash)
                 {
                     AppLogger.Error($"Update checksum mismatch (expected '{expectedHash}', got '{actualHash}'). Aborting self-update — will not install an unverified download.");
+                    Report(DownloadStage.Failed, "Checksum verification failed; update aborted.", currentVersion, targetVersion);
                     TryDeleteFile(msiPath);
                     return;
                 }
@@ -106,6 +116,7 @@ public static class SelfUpdateService
             }
 
             AppLogger.Info("Applying update via msiexec (silent, no prompt — this process already runs as SYSTEM).");
+            Report(DownloadStage.Installing, $"Installing v{targetVersion}...", currentVersion, targetVersion);
             var psi = new ProcessStartInfo
             {
                 FileName = "msiexec.exe",
@@ -114,6 +125,7 @@ public static class SelfUpdateService
                 CreateNoWindow = true,
             };
             Process.Start(psi);
+            Report(DownloadStage.Done, $"Update to v{targetVersion} applied. The service will restart shortly.", currentVersion, targetVersion);
 
             // The MSI's ServiceControl entries will stop this very service, replace its
             // files, and restart it — nothing further to do from inside this process.
@@ -121,8 +133,51 @@ public static class SelfUpdateService
         catch (Exception ex)
         {
             AppLogger.Error("Failed to apply update", ex);
+            Report(DownloadStage.Failed, $"Update failed: {ex.Message}", currentVersion, targetVersion);
             if (msiPath != null) TryDeleteFile(msiPath);
         }
+    }
+
+    private static async Task DownloadWithProgressAsync(string url, string destinationPath, string currentVersion, string targetVersion)
+    {
+        using var response = await Http.GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
+        response.EnsureSuccessStatusCode();
+
+        var totalBytes = response.Content.Headers.ContentLength ?? 0;
+        await using var httpStream = await response.Content.ReadAsStreamAsync();
+        await using var fileStream = File.Create(destinationPath);
+
+        var buffer = new byte[81920];
+        long bytesReceived = 0;
+        var lastReport = DateTime.MinValue;
+        int read;
+        while ((read = await httpStream.ReadAsync(buffer)) > 0)
+        {
+            await fileStream.WriteAsync(buffer.AsMemory(0, read));
+            bytesReceived += read;
+
+            var now = DateTime.UtcNow;
+            if (now - lastReport > TimeSpan.FromMilliseconds(200))
+            {
+                lastReport = now;
+                Report(DownloadStage.Downloading, $"Downloading v{targetVersion}...", currentVersion, targetVersion, bytesReceived, totalBytes);
+            }
+        }
+
+        Report(DownloadStage.Downloading, $"Downloading v{targetVersion}...", currentVersion, targetVersion, bytesReceived, totalBytes);
+    }
+
+    private static void Report(DownloadStage stage, string message, string? currentVersion, string? targetVersion, long bytesReceived = 0, long totalBytes = 0)
+    {
+        ProgressChanged?.Invoke(new DownloadProgress
+        {
+            Stage = stage,
+            Message = message,
+            CurrentVersion = currentVersion,
+            TargetVersion = targetVersion,
+            BytesReceived = bytesReceived,
+            TotalBytes = totalBytes,
+        });
     }
 
     private static void TryDeleteFile(string path)

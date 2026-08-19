@@ -64,6 +64,7 @@ public class MainForm : Form
     // Dashboard
     private Label _lblClamAvStatus = null!;
     private Button _btnInstallClamAv = null!;
+    private ProgressBar _clamAvInstallProgressBar = null!;
     private StatCard _cardProtection = null!;
     private StatCard _cardEngine = null!;
     private StatCard _cardDbVersion = null!;
@@ -122,6 +123,8 @@ public class MainForm : Form
     private CheckBox _chkShowNotifications = null!;
     private ListBox _lstExclusions = null!;
     private Label _lblUpdateStatus = null!;
+    private Label _lblUpdateVersions = null!;
+    private ProgressBar _updateProgressBar = null!;
 
     public MainForm()
     {
@@ -271,11 +274,8 @@ public class MainForm : Form
         _client.LogLine += line => SafeInvoke(() => AppendActivity(line));
         _client.UpdateLogLine += line => SafeInvoke(() => _txtUpdateLog.AppendText(line + Environment.NewLine));
         _client.ConnectionStateChanged += connected => SafeInvoke(() => OnConnectionStateChanged(connected));
-        _client.ClamAvInstallStatus += msg => SafeInvoke(() =>
-        {
-            _lblClamAvStatus.Text = msg;
-            AppendActivity(msg);
-        });
+        _client.ClamAvInstallProgress += progress => SafeInvoke(() => OnClamAvInstallProgress(progress));
+        _client.AppUpdateProgress += progress => SafeInvoke(() => OnAppUpdateProgress(progress));
 
         _lblClamAvStatus.Text = "Connecting to ClamAV Guardian service...";
         _lblClamAvStatus.ForeColor = Theme.TextSecondary;
@@ -472,6 +472,7 @@ public class MainForm : Form
         root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
 
         root.Controls.Add(PageHeading("Dashboard"));
@@ -491,6 +492,16 @@ public class MainForm : Form
         clamAvStatusRow.Controls.Add(_lblClamAvStatus);
         clamAvStatusRow.Controls.Add(_btnInstallClamAv);
         root.Controls.Add(clamAvStatusRow);
+
+        _clamAvInstallProgressBar = new ProgressBar
+        {
+            Dock = DockStyle.Top,
+            Height = 6,
+            Style = ProgressBarStyle.Continuous,
+            Visible = false,
+            Margin = new Padding(0, 0, 0, 12),
+        };
+        root.Controls.Add(_clamAvInstallProgressBar);
 
         var statsFlow = new FlowLayoutPanel { AutoSize = true, FlowDirection = FlowDirection.LeftToRight };
         _cardProtection = NewCard("Protection Status", "Checking...", Theme.AccentGray);
@@ -1092,7 +1103,7 @@ public class MainForm : Form
         exclusionsLayout.SetRow(exclusionButtons, 2);
         exclusionsGroup.Controls.Add(exclusionsLayout);
 
-        var updateGroup = new RoundedPanel { Height = 100, Dock = DockStyle.Top, Padding = new Padding(16), Margin = new Padding(0, 12, 0, 0) };
+        var updateGroup = new RoundedPanel { Height = 130, Dock = DockStyle.Top, Padding = new Padding(16), Margin = new Padding(0, 12, 0, 0) };
         var updateLayout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1 };
         updateLayout.Controls.Add(new Label { Text = "Software Updates", AutoSize = true, Font = Theme.FontBodyBold, Margin = new Padding(0, 0, 0, 8) });
         var updateRow = new FlowLayoutPanel { AutoSize = true };
@@ -1111,6 +1122,28 @@ public class MainForm : Form
         updateRow.Controls.Add(_lblUpdateStatus);
         updateRow.Controls.Add(btnCheckForUpdates);
         updateLayout.Controls.Add(updateRow);
+
+        _lblUpdateVersions = new Label
+        {
+            Text = string.Empty,
+            AutoSize = true,
+            Font = Theme.FontBody,
+            ForeColor = Theme.TextSecondary,
+            Margin = new Padding(0, 2, 0, 4),
+            Visible = false,
+        };
+        updateLayout.Controls.Add(_lblUpdateVersions);
+
+        _updateProgressBar = new ProgressBar
+        {
+            Width = 300,
+            Height = 8,
+            Style = ProgressBarStyle.Continuous,
+            Visible = false,
+            Margin = new Padding(0, 0, 0, 4),
+        };
+        updateLayout.Controls.Add(_updateProgressBar);
+
         updateGroup.Controls.Add(updateLayout);
 
         root.Controls.Add(clamAvGroup);
@@ -1159,10 +1192,55 @@ public class MainForm : Form
 
         if (choice == DialogResult.Yes)
         {
-            _lblUpdateStatus.Text = "Downloading and installing update...";
+            _updateProgressBar.Visible = true;
+            _updateProgressBar.Value = 0;
+            _lblUpdateVersions.Visible = true;
+            _lblUpdateVersions.Text = $"Current: v{System.Reflection.Assembly.GetExecutingAssembly().GetName().Version} → Target: v{result.LatestVersion}";
             await _client.Service.ApplyAppUpdateAsync();
-            _lblUpdateStatus.Text = "Update applied. The service will restart shortly.";
         }
+    }
+
+    private void OnAppUpdateProgress(DownloadProgress progress)
+    {
+        _updateProgressBar.Visible = progress.Stage is not (DownloadStage.Done or DownloadStage.Failed);
+        _lblUpdateVersions.Visible = progress.TargetVersion != null;
+
+        if (progress.TargetVersion != null)
+        {
+            _lblUpdateVersions.Text = $"Current: v{progress.CurrentVersion} → Target: v{progress.TargetVersion}";
+        }
+
+        if (progress.Stage == DownloadStage.Downloading && progress.TotalBytes > 0)
+        {
+            _updateProgressBar.Style = ProgressBarStyle.Continuous;
+            _updateProgressBar.Value = Math.Clamp(progress.PercentComplete, 0, 100);
+            _lblUpdateStatus.Text = $"{progress.Message} ({progress.PercentComplete}% — {FormatBytes(progress.BytesReceived)} / {FormatBytes(progress.TotalBytes)})";
+        }
+        else
+        {
+            _updateProgressBar.Style = ProgressBarStyle.Marquee;
+            _lblUpdateStatus.Text = progress.Message;
+        }
+
+        if (progress.Stage == DownloadStage.Failed)
+        {
+            _lblUpdateStatus.ForeColor = Theme.AccentRed;
+        }
+        else if (progress.Stage == DownloadStage.Done)
+        {
+            _lblUpdateStatus.ForeColor = Theme.AccentGreen;
+        }
+        else
+        {
+            _lblUpdateStatus.ForeColor = Theme.TextSecondary;
+        }
+    }
+
+    private static string FormatBytes(long bytes)
+    {
+        if (bytes >= 1024 * 1024) return $"{bytes / (1024.0 * 1024.0):0.#} MB";
+        if (bytes >= 1024) return $"{bytes / 1024.0:0.#} KB";
+        return $"{bytes} B";
     }
 
     private async Task InstallClamAvAsync()
@@ -1174,12 +1252,15 @@ public class MainForm : Form
         }
 
         _btnInstallClamAv.Enabled = false;
+        _clamAvInstallProgressBar.Visible = true;
+        _clamAvInstallProgressBar.Value = 0;
         _lblClamAvStatus.Text = "Starting ClamAV install...";
         _lblClamAvStatus.ForeColor = Theme.TextSecondary;
 
         var result = await _client.Service.InstallClamAvAsync();
 
         _btnInstallClamAv.Enabled = true;
+        _clamAvInstallProgressBar.Visible = false;
 
         if (result.Success)
         {
@@ -1195,6 +1276,26 @@ public class MainForm : Form
             _lblClamAvStatus.ForeColor = Theme.AccentRed;
             MessageBox.Show($"Failed to install ClamAV automatically: {result.Message}\n\nYou can still install it manually from clamav.net and point Settings at it.", "ClamAV Guardian", MessageBoxButtons.OK, MessageBoxIcon.Warning);
         }
+    }
+
+    private void OnClamAvInstallProgress(DownloadProgress progress)
+    {
+        AppendActivity(progress.Message);
+
+        if (progress.Stage == DownloadStage.Downloading && progress.TotalBytes > 0)
+        {
+            _clamAvInstallProgressBar.Visible = true;
+            _clamAvInstallProgressBar.Style = ProgressBarStyle.Continuous;
+            _clamAvInstallProgressBar.Value = Math.Clamp(progress.PercentComplete, 0, 100);
+            _lblClamAvStatus.Text = $"{progress.Message} ({progress.PercentComplete}% — {FormatBytes(progress.BytesReceived)} / {FormatBytes(progress.TotalBytes)})";
+        }
+        else
+        {
+            _clamAvInstallProgressBar.Style = ProgressBarStyle.Marquee;
+            _lblClamAvStatus.Text = progress.Message;
+        }
+
+        _lblClamAvStatus.ForeColor = progress.Stage == DownloadStage.Failed ? Theme.AccentRed : Theme.TextSecondary;
     }
 
     private async Task ApplyClamAvPathAsync()
