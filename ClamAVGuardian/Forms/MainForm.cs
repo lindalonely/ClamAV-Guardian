@@ -536,6 +536,26 @@ public class MainForm : Form
         BackColor = Color.Transparent,
     };
 
+    /// <summary>
+    /// WinForms ListView columns don't natively support "fill remaining space" — without
+    /// this, resizing the window just leaves a growing dead gray gap instead of the table
+    /// actually using the extra width. Column 0 absorbs whatever's left after the others.
+    /// </summary>
+    private static void MakeFirstColumnFill(ListView listView, int minWidth = 200)
+    {
+        void Resize()
+        {
+            if (listView.Columns.Count == 0 || listView.ClientSize.Width == 0) return;
+            var otherWidths = 0;
+            for (var i = 1; i < listView.Columns.Count; i++) otherWidths += listView.Columns[i].Width;
+            var scrollbarAllowance = listView.Items.Count > 0 ? SystemInformation.VerticalScrollBarWidth : 0;
+            listView.Columns[0].Width = Math.Max(minWidth, listView.ClientSize.Width - otherWidths - scrollbarAllowance - 2);
+        }
+
+        listView.Resize += (_, _) => Resize();
+        listView.HandleCreated += (_, _) => Resize();
+    }
+
     private static StatCard NewCard(string title, string value, Color accent, string? subtitle = null)
     {
         var card = new StatCard { TitleText = title, ValueText = value, AccentColor = accent };
@@ -652,6 +672,7 @@ public class MainForm : Form
         _lvScanResults.Columns.Add("Status", 120);
         _lvScanResults.Columns.Add("Threat", 240);
         _lvScanResults.ContextMenuStrip = BuildScanResultsContextMenu();
+        MakeFirstColumnFill(_lvScanResults);
         resultsCard.Controls.Add(_lvScanResults);
 
         root.Controls.Add(optionsPanel);
@@ -811,6 +832,7 @@ public class MainForm : Form
         _lvQuarantine.Columns.Add("Threat", 200);
         _lvQuarantine.Columns.Add("Quarantined At", 160);
         _lvQuarantine.Columns.Add("Size (bytes)", 100);
+        MakeFirstColumnFill(_lvQuarantine);
         _lblQuarantineEmpty = CreateEmptyStateLabel("No quarantined files. Threats found during scans or real-time protection will show up here.");
         listCard.Controls.Add(_lvQuarantine);
         listCard.Controls.Add(_lblQuarantineEmpty);
@@ -941,8 +963,12 @@ public class MainForm : Form
         var clamAvGroup = new RoundedPanel { AutoSize = false, Height = 110, Dock = DockStyle.Top, Padding = new Padding(16), Margin = new Padding(0, 12, 0, 0) };
         var clamAvLayout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1 };
         clamAvLayout.Controls.Add(new Label { Text = "ClamAV Installation", AutoSize = true, Font = Theme.FontBodyBold, Margin = new Padding(0, 0, 0, 8) });
-        var clamAvRow = new FlowLayoutPanel { AutoSize = true };
-        _txtClamAvPath = new TextBox { Width = 380 };
+        var clamAvRow = new TableLayoutPanel { Dock = DockStyle.Top, ColumnCount = 4, AutoSize = true };
+        clamAvRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        clamAvRow.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        clamAvRow.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        clamAvRow.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        _txtClamAvPath = new TextBox { Dock = DockStyle.Fill, Anchor = AnchorStyles.Left | AnchorStyles.Right };
         Theme.StyleTextBox(_txtClamAvPath);
         var btnBrowseClamAv = new Button { Text = "Browse...", Margin = new Padding(8, 0, 0, 0) };
         var btnAutoDetect = new Button { Text = "Auto-Detect", Margin = new Padding(8, 0, 0, 0) };
@@ -963,18 +989,20 @@ public class MainForm : Form
             else MessageBox.Show("Could not auto-detect ClamAV. Please browse to the install folder manually.", "ClamAV Guardian");
         };
         btnApplyClamAv.Click += async (_, _) => await ApplyClamAvPathAsync();
-        clamAvRow.Controls.Add(_txtClamAvPath);
-        clamAvRow.Controls.Add(btnBrowseClamAv);
-        clamAvRow.Controls.Add(btnAutoDetect);
-        clamAvRow.Controls.Add(btnApplyClamAv);
+        clamAvRow.Controls.Add(_txtClamAvPath, 0, 0);
+        clamAvRow.Controls.Add(btnBrowseClamAv, 1, 0);
+        clamAvRow.Controls.Add(btnAutoDetect, 2, 0);
+        clamAvRow.Controls.Add(btnApplyClamAv, 3, 0);
         clamAvLayout.Controls.Add(clamAvRow);
         clamAvGroup.Controls.Add(clamAvLayout);
 
         var quarantineGroup = new RoundedPanel { Height = 100, Dock = DockStyle.Top, Padding = new Padding(16), Margin = new Padding(0, 12, 0, 0) };
         var quarantineLayout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1 };
         quarantineLayout.Controls.Add(new Label { Text = "Quarantine Location", AutoSize = true, Font = Theme.FontBodyBold, Margin = new Padding(0, 0, 0, 8) });
-        var quarantineRow = new FlowLayoutPanel { AutoSize = true };
-        _txtQuarantinePath = new TextBox { Width = 380, ReadOnly = true };
+        var quarantineRow = new TableLayoutPanel { Dock = DockStyle.Top, ColumnCount = 2, AutoSize = true };
+        quarantineRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        quarantineRow.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        _txtQuarantinePath = new TextBox { Dock = DockStyle.Fill, Anchor = AnchorStyles.Left | AnchorStyles.Right, ReadOnly = true };
         Theme.StyleTextBox(_txtQuarantinePath);
         var lblQuarantineNote = new Label
         {
@@ -984,8 +1012,8 @@ public class MainForm : Form
             ForeColor = Theme.TextSecondary,
             Margin = new Padding(8, 8, 0, 0),
         };
-        quarantineRow.Controls.Add(_txtQuarantinePath);
-        quarantineRow.Controls.Add(lblQuarantineNote);
+        quarantineRow.Controls.Add(_txtQuarantinePath, 0, 0);
+        quarantineRow.Controls.Add(lblQuarantineNote, 1, 0);
         quarantineLayout.Controls.Add(quarantineRow);
         quarantineGroup.Controls.Add(quarantineLayout);
 
