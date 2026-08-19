@@ -888,8 +888,8 @@ public class MainForm : Form
         _cardLastUpdateUpd = NewCard("Last Update", "Never", Theme.AccentBlue);
         foreach (var card in new[] { _cardServiceState, _cardDbVersionUpd, _cardLastUpdateUpd })
         {
-            card.Size = new Size(220, 90);
-            card.Margin = new Padding(0, 0, 16, 0);
+            card.Size = new Size(220, 110);
+            card.Margin = new Padding(0, 0, 16, 12);
             statsFlow.Controls.Add(card);
         }
 
@@ -1712,7 +1712,13 @@ public class MainForm : Form
             _ => "Unknown",
         };
 
-        _cardServiceState.ValueText = status.ServiceState == FreshClamServiceState.Running ? "Running" : stateText.Split(' ')[0];
+        _cardServiceState.ValueText = status.ServiceState switch
+        {
+            FreshClamServiceState.Running => "Running",
+            FreshClamServiceState.Stopped => "Stopped",
+            FreshClamServiceState.NotInstalled => "Not Installed",
+            _ => "Unknown",
+        };
         _cardServiceState.SubtitleText = stateText;
         _cardServiceState.AccentColor = status.ServiceState switch
         {
@@ -1728,7 +1734,7 @@ public class MainForm : Form
         _cardDbVersion.SubtitleText = _cardDbVersionUpd.SubtitleText;
 
         var lastUpdateText = status.LastUpdateUtc.HasValue ? status.LastUpdateUtc.Value.ToLocalTime().ToString("g") : "unknown";
-        _cardLastUpdateUpd.ValueText = status.LastUpdateUtc.HasValue ? status.LastUpdateUtc.Value.ToLocalTime().ToString("MMM d, t") : "Never";
+        _cardLastUpdateUpd.ValueText = status.LastUpdateUtc.HasValue ? status.LastUpdateUtc.Value.ToLocalTime().ToString("MMM d, h:mm tt") : "Never";
         _cardLastUpdateUpd.SubtitleText = lastUpdateText;
         _cardLastUpdate.ValueText = status.LastUpdateUtc.HasValue ? status.LastUpdateUtc.Value.ToLocalTime().ToString("MMM d") : "Never";
         _cardLastUpdate.SubtitleText = status.LastUpdateUtc.HasValue ? status.LastUpdateUtc.Value.ToLocalTime().ToString("t") : "";
