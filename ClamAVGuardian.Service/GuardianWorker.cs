@@ -26,11 +26,37 @@ public class GuardianWorker : BackgroundService
 
         try
         {
-            await Task.Delay(Timeout.Infinite, stoppingToken);
+            // Check once shortly after startup, then daily — fully unattended: if a newer
+            // version is published, it downloads, verifies its checksum, and installs
+            // itself via silent msiexec with no prompt, since this process is already SYSTEM.
+            await Task.Delay(TimeSpan.FromMinutes(5), stoppingToken);
+
+            while (!stoppingToken.IsCancellationRequested)
+            {
+                await CheckAndApplyUpdateAsync();
+                await Task.Delay(TimeSpan.FromHours(24), stoppingToken);
+            }
         }
         catch (OperationCanceledException)
         {
             // Expected on service stop.
+        }
+    }
+
+    private static async Task CheckAndApplyUpdateAsync()
+    {
+        try
+        {
+            var result = await SelfUpdateService.CheckForUpdateAsync();
+            if (result.UpdateAvailable)
+            {
+                AppLogger.Info($"Applying self-update to v{result.LatestVersion}.");
+                await SelfUpdateService.ApplyPendingUpdateAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Error("Background self-update check failed", ex);
         }
     }
 

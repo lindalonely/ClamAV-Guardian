@@ -31,7 +31,6 @@ public class AppSettings
     public bool ShowNotifications { get; set; } = true;
 
     public PostScanAction AfterScanAction { get; set; } = PostScanAction.None;
-    public bool DesktopShortcutCreated { get; set; } = false;
 
     public static string DefaultQuarantinePath =>
         System.IO.Path.Combine(

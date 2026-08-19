@@ -44,6 +44,8 @@ public class MainForm : Form
     private const byte VK_MENU = 0x12; // ALT
     private const uint KEYEVENTF_KEYUP = 0x0002;
 
+    public const string ShowRequestEventName = "ClamAVGuardian_ShowRequest";
+
     private AppSettings _settings = new();
     private ClamAvInstallation? _install;
     private readonly GuardianServiceClient _client = new();
@@ -51,6 +53,8 @@ public class MainForm : Form
     private NotifyIcon _trayIcon = null!;
     private bool _isExiting;
     private int _threatsThisSession;
+    private EventWaitHandle? _showRequestEvent;
+    private CancellationTokenSource? _showRequestListenerCts;
 
     // Navigation
     private Panel _contentHost = null!;
@@ -116,6 +120,7 @@ public class MainForm : Form
     private CheckBox _chkStartMinimized = null!;
     private CheckBox _chkShowNotifications = null!;
     private ListBox _lstExclusions = null!;
+    private Label _lblUpdateStatus = null!;
 
     public MainForm()
     {
@@ -130,9 +135,33 @@ public class MainForm : Form
 
         BuildTrayIcon();
         BuildUi();
+        StartShowRequestListener();
 
         Load += async (_, _) => await InitializeAsync();
         FormClosing += MainForm_FormClosing;
+    }
+
+    /// <summary>
+    /// A second launch attempt (e.g. clicking the desktop/Start Menu icon while already
+    /// auto-started and hidden in the tray) signals this event instead of showing a "already
+    /// running" dialog; we just bring the existing window forward, like any normal tray app.
+    /// </summary>
+    private void StartShowRequestListener()
+    {
+        _showRequestEvent = new EventWaitHandle(false, EventResetMode.AutoReset, ShowRequestEventName);
+        _showRequestListenerCts = new CancellationTokenSource();
+        var token = _showRequestListenerCts.Token;
+
+        _ = Task.Run(() =>
+        {
+            while (!token.IsCancellationRequested)
+            {
+                if (_showRequestEvent.WaitOne(TimeSpan.FromSeconds(1)))
+                {
+                    SafeInvoke(ShowAndFocus);
+                }
+            }
+        }, token);
     }
 
     private void SafeInvoke(Action action)
@@ -224,6 +253,8 @@ public class MainForm : Form
             return;
         }
 
+        _showRequestListenerCts?.Cancel();
+        _showRequestEvent?.Dispose();
         _client.Dispose();
         _trayIcon.Visible = false;
     }
@@ -903,6 +934,7 @@ public class MainForm : Form
         root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
 
         root.Controls.Add(PageHeading("Settings"));
 
@@ -1018,10 +1050,32 @@ public class MainForm : Form
         exclusionsLayout.SetRow(exclusionButtons, 2);
         exclusionsGroup.Controls.Add(exclusionsLayout);
 
+        var updateGroup = new RoundedPanel { Height = 100, Dock = DockStyle.Top, Padding = new Padding(16), Margin = new Padding(0, 12, 0, 0) };
+        var updateLayout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1 };
+        updateLayout.Controls.Add(new Label { Text = "Software Updates", AutoSize = true, Font = Theme.FontBodyBold, Margin = new Padding(0, 0, 0, 8) });
+        var updateRow = new FlowLayoutPanel { AutoSize = true };
+        var currentVersion = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version;
+        _lblUpdateStatus = new Label
+        {
+            Text = $"ClamAV Guardian v{currentVersion?.ToString(3)}. Checked automatically every 24 hours.",
+            AutoSize = true,
+            Font = Theme.FontBody,
+            ForeColor = Theme.TextSecondary,
+            Margin = new Padding(0, 6, 12, 0),
+        };
+        var btnCheckForUpdates = new Button { Text = "Check for Updates" };
+        Theme.StyleSecondaryButton(btnCheckForUpdates);
+        btnCheckForUpdates.Click += async (_, _) => await CheckForUpdatesAsync();
+        updateRow.Controls.Add(_lblUpdateStatus);
+        updateRow.Controls.Add(btnCheckForUpdates);
+        updateLayout.Controls.Add(updateRow);
+        updateGroup.Controls.Add(updateLayout);
+
         root.Controls.Add(clamAvGroup);
         root.Controls.Add(quarantineGroup);
         root.Controls.Add(generalGroup);
         root.Controls.Add(exclusionsGroup);
+        root.Controls.Add(updateGroup);
 
         page.Controls.Add(root);
         return page;
@@ -1035,6 +1089,38 @@ public class MainForm : Form
     {
         if (!_client.IsConnected) return;
         await _client.Service.SaveSettingsAsync(_settings);
+    }
+
+    private async Task CheckForUpdatesAsync()
+    {
+        if (!_client.IsConnected)
+        {
+            MessageBox.Show("Not connected to the ClamAV Guardian service.", "ClamAV Guardian");
+            return;
+        }
+
+        _lblUpdateStatus.Text = "Checking for updates...";
+        var result = await _client.Service.CheckForAppUpdateAsync();
+
+        if (!result.UpdateAvailable)
+        {
+            _lblUpdateStatus.Text = $"You're up to date (checked just now).";
+            return;
+        }
+
+        _lblUpdateStatus.Text = $"Version {result.LatestVersion} is available.";
+        var choice = MessageBox.Show(
+            $"ClamAV Guardian v{result.LatestVersion} is available. Install it now?\n\nThe background service will apply it automatically (no restart needed for your files/settings) and briefly restart itself.",
+            "Update Available",
+            MessageBoxButtons.YesNo,
+            MessageBoxIcon.Information);
+
+        if (choice == DialogResult.Yes)
+        {
+            _lblUpdateStatus.Text = "Downloading and installing update...";
+            await _client.Service.ApplyAppUpdateAsync();
+            _lblUpdateStatus.Text = "Update applied. The service will restart shortly.";
+        }
     }
 
     private async Task ApplyClamAvPathAsync()
@@ -1084,17 +1170,19 @@ public class MainForm : Form
     /// The MSI's per-machine Desktop shortcut resolves to the shared Public Desktop, which
     /// isn't visible when OneDrive (or similar) redirects the user's personal Desktop folder.
     /// Creating it here instead uses the live-resolved path, so it lands wherever the user's
-    /// desktop actually is right now. Runs once (tracked in settings) so a user who
-    /// intentionally deletes the shortcut later doesn't get it silently recreated forever.
+    /// desktop actually is right now. Checked on every launch against the actual file on disk
+    /// (not a persisted "already done" flag) — that flag previously got stuck true after a
+    /// shortcut vanished for unrelated reasons (OneDrive sync churn, etc.), permanently
+    /// blocking retries even though the icon was gone.
     /// </summary>
-    private async Task EnsureDesktopShortcutAsync()
+    private Task EnsureDesktopShortcutAsync()
     {
-        if (_settings.DesktopShortcutCreated) return;
-
         try
         {
             var desktopDir = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
             var shortcutPath = Path.Combine(desktopDir, "ClamAV Guardian.lnk");
+
+            if (File.Exists(shortcutPath)) return Task.CompletedTask;
 
             var shellType = Type.GetTypeFromProgID("WScript.Shell");
             if (shellType != null)
@@ -1116,11 +1204,8 @@ public class MainForm : Form
         {
             ClientLogger.Error("Failed to create desktop shortcut", ex);
         }
-        finally
-        {
-            _settings.DesktopShortcutCreated = true;
-            await SaveSettingsAsync();
-        }
+
+        return Task.CompletedTask;
     }
 
     private async Task StartScanAsync()
