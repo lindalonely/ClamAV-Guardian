@@ -1,9 +1,15 @@
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
      xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
 
+  <!-- CI passes the release version via `wix build -d ProductVersion=X.Y.Z.W` (derived from
+       the git tag); this default only matters for an ad-hoc local build without that flag. -->
+  <?ifndef ProductVersion?>
+  <?define ProductVersion = "1.2.6.0"?>
+  <?endif?>
+
   <Package Name="ClamAV Guardian"
            Manufacturer="ClamAV Guardian Project"
-           Version="1.2.6.0"
+           Version="$(var.ProductVersion)"
            UpgradeCode="9cba3fd8-b496-4442-bf08-2589e7ef6f2c"
            Compressed="yes"
            Scope="perMachine">

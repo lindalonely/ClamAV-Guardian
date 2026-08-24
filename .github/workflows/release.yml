@@ -1,0 +1,165 @@
+name: Release
+
+# Triggers on a version tag push (e.g. `git tag v1.2.7.0 && git push origin v1.2.7.0`),
+# or manually via the Actions tab for a test run. The version embedded in the built
+# exe/dll/MSI is derived entirely from the tag — you no longer need to hand-edit
+# Version in the two .csproj files or Product.wxs before tagging a release.
+#
+# ---------------------------------------------------------------------------
+# SETUP REQUIRED BEFORE THIS WORKFLOW CAN SUCCEED — see the "Sign *" steps below:
+#
+# 1. Apply for a SignPath.io project (SignPath Foundation offers free code-signing
+#    certificates for qualifying open-source projects — see signpath.io). You'll end
+#    up with: an organization ID, a project, a signing policy, and one "artifact
+#    configuration" per file you want signed.
+# 2. Add these as repository secrets (Settings > Secrets and variables > Actions):
+#      SIGNPATH_API_TOKEN       - API token from your SignPath account
+#      SIGNPATH_ORGANIZATION_ID - your SignPath organization ID
+# 3. Replace the placeholder `project-slug`, `signing-policy-slug`, and
+#    `artifact-configuration-slug` values below (marked TODO) with the real slugs
+#    from your SignPath project dashboard.
+#
+# Until that's done, the build/package steps will still run fine — only the three
+# "Sign *" steps will fail, since they have nothing valid to submit to.
+# ---------------------------------------------------------------------------
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to build (e.g. 1.2.7.0) - only used for manual runs'
+        required: true
+        default: '0.0.0.0'
+
+permissions:
+  contents: write
+
+jobs:
+  build-sign-release:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Determine version
+        id: version
+        shell: pwsh
+        run: |
+          if ("${{ github.ref_type }}" -eq "tag") {
+            $version = "${{ github.ref_name }}" -replace '^v', ''
+          } else {
+            $version = "${{ github.event.inputs.version }}"
+          }
+          Write-Output "version=$version" >> $env:GITHUB_OUTPUT
+          Write-Output "Building version $version"
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Install WiX Toolset v5
+        run: |
+          dotnet tool install --global wix --version 5.*
+          wix extension add WixToolset.UI.wixext WixToolset.Util.wixext
+
+      - name: Publish client (unsigned)
+        run: dotnet publish ClamAVGuardian/ClamAVGuardian.csproj -c Release -r win-x64 -p:Version=${{ steps.version.outputs.version }}
+
+      - name: Publish service (unsigned)
+        run: dotnet publish ClamAVGuardian.Service/ClamAVGuardian.Service.csproj -c Release -r win-x64 -p:Version=${{ steps.version.outputs.version }}
+
+      - name: Upload unsigned client exe for signing
+        id: upload-client
+        uses: actions/upload-artifact@v4
+        with:
+          name: unsigned-client
+          path: ClamAVGuardian/bin/Release/net8.0-windows/win-x64/publish/ClamAVGuardian.exe
+          retention-days: 1
+
+      - name: Upload unsigned service exe for signing
+        id: upload-service
+        uses: actions/upload-artifact@v4
+        with:
+          name: unsigned-service
+          path: ClamAVGuardian.Service/bin/Release/net8.0-windows/win-x64/publish/ClamAVGuardian.Service.exe
+          retention-days: 1
+
+      # TODO: replace project-slug / signing-policy-slug / artifact-configuration-slug
+      # with the real values from your SignPath project once it's set up.
+      - name: Sign client exe with SignPath
+        uses: signpath/github-action-submit-signing-request@v1
+        with:
+          api-token: '${{ secrets.SIGNPATH_API_TOKEN }}'
+          organization-id: '${{ secrets.SIGNPATH_ORGANIZATION_ID }}'
+          project-slug: 'clamav-guardian'
+          signing-policy-slug: 'release-signing'
+          artifact-configuration-slug: 'client-exe'
+          github-artifact-id: '${{ steps.upload-client.outputs.artifact-id }}'
+          wait-for-completion: true
+          output-artifact-directory: 'signed/client'
+
+      - name: Sign service exe with SignPath
+        uses: signpath/github-action-submit-signing-request@v1
+        with:
+          api-token: '${{ secrets.SIGNPATH_API_TOKEN }}'
+          organization-id: '${{ secrets.SIGNPATH_ORGANIZATION_ID }}'
+          project-slug: 'clamav-guardian'
+          signing-policy-slug: 'release-signing'
+          artifact-configuration-slug: 'service-exe'
+          github-artifact-id: '${{ steps.upload-service.outputs.artifact-id }}'
+          wait-for-completion: true
+          output-artifact-directory: 'signed/service'
+
+      - name: Replace unsigned exes with signed ones
+        shell: pwsh
+        run: |
+          Copy-Item 'signed/client/ClamAVGuardian.exe' 'ClamAVGuardian/bin/Release/net8.0-windows/win-x64/publish/ClamAVGuardian.exe' -Force
+          Copy-Item 'signed/service/ClamAVGuardian.Service.exe' 'ClamAVGuardian.Service/bin/Release/net8.0-windows/win-x64/publish/ClamAVGuardian.Service.exe' -Force
+
+      - name: Build MSI (with signed exes inside)
+        run: |
+          wix build -arch x64 -ext WixToolset.UI.wixext -ext WixToolset.Util.wixext `
+            -d ProductVersion=${{ steps.version.outputs.version }} `
+            Installer/Product.wxs `
+            -o ClamAVGuardianSetup-${{ steps.version.outputs.version }}.msi
+
+      - name: Upload unsigned MSI for signing
+        id: upload-msi
+        uses: actions/upload-artifact@v4
+        with:
+          name: unsigned-msi
+          path: ClamAVGuardianSetup-${{ steps.version.outputs.version }}.msi
+          retention-days: 1
+
+      - name: Sign MSI with SignPath
+        uses: signpath/github-action-submit-signing-request@v1
+        with:
+          api-token: '${{ secrets.SIGNPATH_API_TOKEN }}'
+          organization-id: '${{ secrets.SIGNPATH_ORGANIZATION_ID }}'
+          project-slug: 'clamav-guardian'
+          signing-policy-slug: 'release-signing'
+          artifact-configuration-slug: 'installer-msi'
+          github-artifact-id: '${{ steps.upload-msi.outputs.artifact-id }}'
+          wait-for-completion: true
+          output-artifact-directory: 'signed/msi'
+
+      - name: Compute checksum of signed MSI
+        shell: pwsh
+        run: |
+          $msi = "signed/msi/ClamAVGuardianSetup-${{ steps.version.outputs.version }}.msi"
+          $hash = (Get-FileHash $msi -Algorithm SHA256).Hash.ToLower()
+          "$hash *ClamAVGuardianSetup-${{ steps.version.outputs.version }}.msi" | Out-File -Encoding ascii "signed/msi/ClamAVGuardianSetup-${{ steps.version.outputs.version }}.msi.sha256"
+
+      - name: Publish GitHub release
+        if: github.ref_type == 'tag'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            signed/msi/ClamAVGuardianSetup-${{ steps.version.outputs.version }}.msi
+            signed/msi/ClamAVGuardianSetup-${{ steps.version.outputs.version }}.msi.sha256
+          name: 'ClamAV Guardian v${{ steps.version.outputs.version }}'
+          generate_release_notes: true
