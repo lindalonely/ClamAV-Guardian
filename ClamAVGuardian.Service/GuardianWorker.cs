@@ -14,6 +14,7 @@ public class GuardianWorker : BackgroundService
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         AppLogger.Info("ClamAV Guardian service starting.");
+        SelfUpdateService.ReconcilePendingUpdate();
 
         _context = new GuardianContext();
         var rpcServer = new RpcServer(_context);

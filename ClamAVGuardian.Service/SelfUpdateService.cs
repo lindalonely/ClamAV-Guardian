@@ -22,7 +22,51 @@ public static class SelfUpdateService
 {
     private const string ReleasesApiUrl = "https://api.github.com/repos/lindalonely/ClamAV-Guardian/releases/latest";
 
+    private static readonly string StateDir = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "ClamAVGuardian");
+    private static readonly string PendingMarkerPath = Path.Combine(StateDir, "pending-update.marker");
+    private static readonly string MsiexecLogPath = Path.Combine(StateDir, "update-msiexec.log");
+
     public static event Action<DownloadProgress>? ProgressChanged;
+
+    /// <summary>
+    /// Called once at service startup, before anything else touches the pending marker.
+    /// If the previous run left one behind, the update that wrote it never actually took
+    /// effect by the time this (older or same) version is running again — the most common
+    /// cause is Windows Smart App Control (or an antivirus) silently blocking the newly
+    /// installed exe/service from running. Logs a clear, actionable message either way and
+    /// always clears the marker so a genuine one-off failure doesn't nag forever.
+    /// </summary>
+    public static void ReconcilePendingUpdate()
+    {
+        try
+        {
+            if (!File.Exists(PendingMarkerPath)) return;
+
+            var lines = File.ReadAllLines(PendingMarkerPath);
+            var targetVersionText = lines.Length > 0 ? lines[0] : null;
+            var currentVersion = Assembly.GetExecutingAssembly().GetName().Version ?? new Version(0, 0, 0, 0);
+
+            if (Version.TryParse(targetVersionText, out var targetVersion) && targetVersion <= currentVersion)
+            {
+                AppLogger.Info($"Self-update to v{targetVersion} completed successfully.");
+            }
+            else
+            {
+                AppLogger.Error(
+                    $"Self-update to v{targetVersionText} did not take effect — still running v{currentVersion}. " +
+                    "This is usually Windows Smart App Control (or an antivirus) blocking the newly installed, " +
+                    $"unsigned executable from running. See '{MsiexecLogPath}' for the msiexec install log, " +
+                    "or check Windows Security > App & browser control > Smart App Control for a block notification.");
+            }
+
+            File.Delete(PendingMarkerPath);
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Error("Failed to reconcile pending self-update state", ex);
+        }
+    }
 
     private static readonly HttpClient Http = CreateHttpClient();
 
@@ -117,10 +161,20 @@ public static class SelfUpdateService
 
             AppLogger.Info("Applying update via msiexec (silent, no prompt — this process already runs as SYSTEM).");
             Report(DownloadStage.Installing, $"Installing v{targetVersion}...", currentVersion, targetVersion);
+
+            // Recorded before launching msiexec (which is about to stop this very service) so
+            // that whichever version starts up next can tell whether this update actually took
+            // effect — see ReconcilePendingUpdate. Deliberately NOT waiting on the msiexec
+            // process here: its own install steps stop this service via SCM, and this method
+            // runs on the same task BackgroundService.StopAsync waits on to shut down, so
+            // blocking here until msiexec exits would deadlock against the stop it's waiting for.
+            Directory.CreateDirectory(StateDir);
+            File.WriteAllText(PendingMarkerPath, targetVersion + Environment.NewLine + DateTime.UtcNow.ToString("O"));
+
             var psi = new ProcessStartInfo
             {
                 FileName = "msiexec.exe",
-                Arguments = $"/i \"{msiPath}\" /quiet /norestart",
+                Arguments = $"/i \"{msiPath}\" /quiet /norestart /l*v \"{MsiexecLogPath}\"",
                 UseShellExecute = false,
                 CreateNoWindow = true,
             };
