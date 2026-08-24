@@ -16,11 +16,19 @@ public class AppSettings
     public string QuarantinePath { get; set; } = string.Empty;
 
     public List<string> RealTimeWatchedFolders { get; set; } = new();
-    public bool RealTimeProtectionEnabled { get; set; } = false;
+    public bool RealTimeProtectionEnabled { get; set; } = true;
     public bool AutoQuarantineOnDetection { get; set; } = true;
 
-    public bool StartWithWindows { get; set; } = false;
-    public bool StartMinimized { get; set; } = false;
+    public bool StartWithWindows { get; set; } = true;
+    public bool StartMinimized { get; set; } = true;
+
+    /// <summary>
+    /// One-time migration marker: false for any settings.json written before protection
+    /// defaults changed to "on". Letting a fresh AppSettings() also default to true keeps
+    /// this consistent for brand-new installs, while existing installs get upgraded to the
+    /// same secure defaults exactly once — after that, whatever the user chooses sticks.
+    /// </summary>
+    public bool SecureDefaultsApplied { get; set; } = false;
 
     public List<string> ScanExclusionPaths { get; set; } = new();
     public List<string> ScanExclusionExtensions { get; set; } = new();

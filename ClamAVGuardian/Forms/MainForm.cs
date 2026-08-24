@@ -316,6 +316,7 @@ public class MainForm : Form
     private async Task RefreshFromServiceAsync()
     {
         _settings = await _client.Service.GetSettingsAsync();
+        await ApplySecureDefaultsIfNeededAsync();
 
         RefreshExclusionsList();
         RefreshWatchedFoldersList();
@@ -364,6 +365,55 @@ public class MainForm : Form
         {
             SetProtectionCard("Not Protected", Theme.AccentRed);
         }
+    }
+
+    /// <summary>
+    /// One-time upgrade of an existing settings.json (or the natural state of a brand-new
+    /// one) to protection-on-by-default: real-time protection, auto-quarantine, notifications,
+    /// start with Windows, and start minimized. Runs once per install — after this, whatever
+    /// the user chooses in Settings sticks, this never re-forces anything. Also seeds a
+    /// starter watch list (Desktop/Downloads/Documents) since enabling real-time protection
+    /// with zero watched folders configured would be a no-op.
+    /// </summary>
+    private async Task ApplySecureDefaultsIfNeededAsync()
+    {
+        if (_settings.SecureDefaultsApplied) return;
+
+        _settings.StartWithWindows = true;
+        _settings.StartMinimized = true;
+        _settings.RealTimeProtectionEnabled = true;
+        _settings.AutoQuarantineOnDetection = true;
+        _settings.ShowNotifications = true;
+
+        if (_settings.RealTimeWatchedFolders.Count == 0)
+        {
+            var userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+            var candidates = new[]
+            {
+                Environment.GetFolderPath(Environment.SpecialFolder.Desktop),
+                Path.Combine(userProfile, "Downloads"),
+                Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
+            };
+
+            foreach (var folder in candidates)
+            {
+                if (!string.IsNullOrEmpty(folder) && Directory.Exists(folder) && !_settings.RealTimeWatchedFolders.Contains(folder))
+                {
+                    _settings.RealTimeWatchedFolders.Add(folder);
+                }
+            }
+        }
+
+        _settings.SecureDefaultsApplied = true;
+        await SaveSettingsAsync();
+
+        // SaveSettingsAsync only persists the flag; if the service was already running before
+        // this upgrade (an existing install, not a fresh one), its real-time watcher needs an
+        // explicit start command too — it won't pick up the new setting on its own until the
+        // next service restart otherwise. No-ops safely if ClamAV isn't located yet.
+        await ToggleRealTimeAsync(true);
+
+        ClientLogger.Info("Applied secure-by-default settings for the first time (real-time protection, auto-quarantine, start with Windows, start minimized, notifications).");
     }
 
     #region UI construction

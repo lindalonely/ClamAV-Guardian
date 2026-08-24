@@ -98,6 +98,10 @@ public class GuardianContext
                     SettingsManager.Save(Settings);
                     WireUpInstallDependentServices();
                     UpdateService?.StartFallbackTimer(Settings.UpdateCheckIntervalHours > 0 ? Settings.UpdateCheckIntervalHours : 2);
+                    if (Settings.RealTimeProtectionEnabled && RealTimeService != null)
+                    {
+                        _ = RealTimeService.StartAsync(Settings.RealTimeWatchedFolders);
+                    }
                 }
                 else
                 {
@@ -124,6 +128,10 @@ public class GuardianContext
         SettingsManager.Save(Settings);
         WireUpInstallDependentServices();
         UpdateService?.StartFallbackTimer(Settings.UpdateCheckIntervalHours > 0 ? Settings.UpdateCheckIntervalHours : 2);
+        if (Settings.RealTimeProtectionEnabled && RealTimeService != null)
+        {
+            _ = RealTimeService.StartAsync(Settings.RealTimeWatchedFolders);
+        }
         return candidate;
     }
 
