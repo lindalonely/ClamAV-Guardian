@@ -521,8 +521,8 @@ public class MainForm : Form
         root.Controls.Add(statsFlow);
 
         var actionsFlow = new FlowLayoutPanel { AutoSize = true, Margin = new Padding(0, 8, 0, 0) };
-        var btnScanNow = new Button { Text = "Scan Now", Width = 150 };
-        var btnUpdateNow = new Button { Text = "Update Now", Width = 150, Margin = new Padding(12, 0, 0, 0) };
+        var btnScanNow = new Button { Text = "Scan Now", AutoSize = true };
+        var btnUpdateNow = new Button { Text = "Update Now", AutoSize = true, Margin = new Padding(12, 0, 0, 0) };
         Theme.StylePrimaryButton(btnScanNow);
         Theme.StyleSecondaryButton(btnUpdateNow);
         Theme.SetIcon(btnScanNow, AppIcon.Search);
@@ -617,7 +617,7 @@ public class MainForm : Form
         _rbCustom = new RadioButton { Text = "Custom Folder:", AutoSize = true, Margin = new Padding(16, 0, 0, 0), Font = Theme.FontBody };
         _txtCustomPath = new TextBox { Width = 320, Margin = new Padding(6, 2, 0, 0) };
         Theme.StyleTextBox(_txtCustomPath);
-        var btnBrowse = new Button { Text = "Browse...", Margin = new Padding(6, 0, 0, 0) };
+        var btnBrowse = new Button { Text = "Browse...", AutoSize = true, Margin = new Padding(6, 0, 0, 0) };
         Theme.StyleSecondaryButton(btnBrowse);
         Theme.SetIcon(btnBrowse, AppIcon.Folder);
         btnBrowse.Click += (_, _) =>
@@ -636,8 +636,8 @@ public class MainForm : Form
         optionsPanel.Controls.Add(btnBrowse);
 
         var actionPanel = new FlowLayoutPanel { AutoSize = true, FlowDirection = FlowDirection.LeftToRight, Margin = new Padding(0, 0, 0, 8) };
-        _btnStartScan = new Button { Text = "Start Scan", Width = 130 };
-        _btnCancelScan = new Button { Text = "Cancel", Width = 100, Enabled = false, Margin = new Padding(8, 0, 0, 0) };
+        _btnStartScan = new Button { Text = "Start Scan", AutoSize = true };
+        _btnCancelScan = new Button { Text = "Cancel", AutoSize = true, Enabled = false, Margin = new Padding(8, 0, 0, 0) };
         Theme.StylePrimaryButton(_btnStartScan);
         Theme.StyleSecondaryButton(_btnCancelScan);
         Theme.SetIcon(_btnStartScan, AppIcon.Play);
@@ -689,7 +689,7 @@ public class MainForm : Form
         bannerLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         bannerLayout.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         _lblScanBanner = new Label { Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft, Font = Theme.FontBodyBold, BackColor = Color.Transparent };
-        _btnQuarantineAllInfected = new Button { Text = "Quarantine All Infected", Anchor = AnchorStyles.Right, Width = 190 };
+        _btnQuarantineAllInfected = new Button { Text = "Quarantine All Infected", Anchor = AnchorStyles.Right, AutoSize = true };
         Theme.StyleDangerButton(_btnQuarantineAllInfected);
         Theme.SetIcon(_btnQuarantineAllInfected, AppIcon.Lock);
         _btnQuarantineAllInfected.Click += async (_, _) => await QuarantineAllInfectedScanResultsAsync();
@@ -756,8 +756,8 @@ public class MainForm : Form
         foldersCard.Controls.Add(_lstWatchedFolders);
 
         var folderButtons = new FlowLayoutPanel { AutoSize = true, Margin = new Padding(0, 8, 0, 0) };
-        var btnAddFolder = new Button { Text = "Add Folder..." };
-        var btnRemoveFolder = new Button { Text = "Remove Selected", Margin = new Padding(8, 0, 0, 0) };
+        var btnAddFolder = new Button { Text = "Add Folder...", AutoSize = true };
+        var btnRemoveFolder = new Button { Text = "Remove Selected", AutoSize = true, Margin = new Padding(8, 0, 0, 0) };
         Theme.StyleSecondaryButton(btnAddFolder);
         Theme.StyleSecondaryButton(btnRemoveFolder);
         Theme.SetIcon(btnAddFolder, AppIcon.Plus);
@@ -823,10 +823,10 @@ public class MainForm : Form
         root.Controls.Add(PageHeading("Quarantine"));
 
         var buttonRow = new FlowLayoutPanel { AutoSize = true, Margin = new Padding(0, 8, 0, 8) };
-        var btnRestore = new Button { Text = "Restore" };
-        var btnDelete = new Button { Text = "Delete Permanently", Margin = new Padding(8, 0, 0, 0) };
-        var btnDeleteAll = new Button { Text = "Delete All", Margin = new Padding(8, 0, 0, 0) };
-        var btnRefresh = new Button { Text = "Refresh", Margin = new Padding(8, 0, 0, 0) };
+        var btnRestore = new Button { Text = "Restore", AutoSize = true };
+        var btnDelete = new Button { Text = "Delete Permanently", AutoSize = true, Margin = new Padding(8, 0, 0, 0) };
+        var btnDeleteAll = new Button { Text = "Delete All", AutoSize = true, Margin = new Padding(8, 0, 0, 0) };
+        var btnRefresh = new Button { Text = "Refresh", AutoSize = true, Margin = new Padding(8, 0, 0, 0) };
         Theme.StyleSecondaryButton(btnRestore);
         Theme.StyleDangerButton(btnDelete);
         Theme.StyleDangerButton(btnDeleteAll);
@@ -909,7 +909,7 @@ public class MainForm : Form
         var intervalPanel = new FlowLayoutPanel { AutoSize = true, Margin = new Padding(0, 0, 0, 8) };
         intervalPanel.Controls.Add(new Label { Text = "Check every (hours):", AutoSize = true, Font = Theme.FontBody, Margin = new Padding(0, 6, 6, 0) });
         _numCheckInterval = new NumericUpDown { Minimum = 1, Maximum = 24, Value = 2, Width = 60 };
-        var btnSaveInterval = new Button { Text = "Save Interval", Margin = new Padding(8, 0, 0, 0) };
+        var btnSaveInterval = new Button { Text = "Save Interval", AutoSize = true, Margin = new Padding(8, 0, 0, 0) };
         Theme.StyleSecondaryButton(btnSaveInterval);
         Theme.SetIcon(btnSaveInterval, AppIcon.Save);
         btnSaveInterval.Click += async (_, _) =>
@@ -922,9 +922,9 @@ public class MainForm : Form
         intervalPanel.Controls.Add(btnSaveInterval);
 
         var buttonRow = new FlowLayoutPanel { AutoSize = true, Margin = new Padding(0, 0, 0, 8) };
-        var btnUpdateNow = new Button { Text = "Update Now" };
-        var btnStartService = new Button { Text = "Start FreshClam Service", Margin = new Padding(8, 0, 0, 0) };
-        var btnStopService = new Button { Text = "Stop FreshClam Service", Margin = new Padding(8, 0, 0, 0) };
+        var btnUpdateNow = new Button { Text = "Update Now", AutoSize = true };
+        var btnStartService = new Button { Text = "Start FreshClam Service", AutoSize = true, Margin = new Padding(8, 0, 0, 0) };
+        var btnStopService = new Button { Text = "Stop FreshClam Service", AutoSize = true, Margin = new Padding(8, 0, 0, 0) };
         Theme.StylePrimaryButton(btnUpdateNow);
         Theme.StyleSecondaryButton(btnStartService);
         Theme.StyleSecondaryButton(btnStopService);
@@ -970,7 +970,7 @@ public class MainForm : Form
         _cmbLogSource = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 200, Font = Theme.FontBody };
         _cmbLogSource.Items.AddRange(new object[] { "Service Log", "FreshClam Log" });
         _cmbLogSource.SelectedIndex = 0;
-        var btnRefreshLog = new Button { Text = "Refresh", Margin = new Padding(8, 0, 0, 0) };
+        var btnRefreshLog = new Button { Text = "Refresh", AutoSize = true, Margin = new Padding(8, 0, 0, 0) };
         Theme.StyleSecondaryButton(btnRefreshLog);
         Theme.SetIcon(btnRefreshLog, AppIcon.Refresh);
         btnRefreshLog.Click += async (_, _) => await RefreshLogViewerAsync();
@@ -1013,9 +1013,9 @@ public class MainForm : Form
         clamAvRow.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         _txtClamAvPath = new TextBox { Dock = DockStyle.Fill, Anchor = AnchorStyles.Left | AnchorStyles.Right };
         Theme.StyleTextBox(_txtClamAvPath);
-        var btnBrowseClamAv = new Button { Text = "Browse...", Margin = new Padding(8, 0, 0, 0) };
-        var btnAutoDetect = new Button { Text = "Auto-Detect", Margin = new Padding(8, 0, 0, 0) };
-        var btnApplyClamAv = new Button { Text = "Apply", Margin = new Padding(8, 0, 0, 0) };
+        var btnBrowseClamAv = new Button { Text = "Browse...", AutoSize = true, Margin = new Padding(8, 0, 0, 0) };
+        var btnAutoDetect = new Button { Text = "Auto-Detect", AutoSize = true, Margin = new Padding(8, 0, 0, 0) };
+        var btnApplyClamAv = new Button { Text = "Apply", AutoSize = true, Margin = new Padding(8, 0, 0, 0) };
         Theme.StyleSecondaryButton(btnBrowseClamAv);
         Theme.StyleSecondaryButton(btnAutoDetect);
         Theme.StylePrimaryButton(btnApplyClamAv);
@@ -1093,8 +1093,8 @@ public class MainForm : Form
         exclusionsLayout.Controls.Add(new Label { Text = "Scan Exclusions (folders)", AutoSize = true, Font = Theme.FontBodyBold, Margin = new Padding(0, 0, 0, 8) });
         _lstExclusions = new ListBox { Dock = DockStyle.Fill, BorderStyle = BorderStyle.FixedSingle, Font = Theme.FontBody };
         var exclusionButtons = new FlowLayoutPanel { AutoSize = true, Margin = new Padding(0, 8, 0, 0) };
-        var btnAddExclusion = new Button { Text = "Add Folder..." };
-        var btnRemoveExclusion = new Button { Text = "Remove Selected", Margin = new Padding(8, 0, 0, 0) };
+        var btnAddExclusion = new Button { Text = "Add Folder...", AutoSize = true };
+        var btnRemoveExclusion = new Button { Text = "Remove Selected", AutoSize = true, Margin = new Padding(8, 0, 0, 0) };
         Theme.StyleSecondaryButton(btnAddExclusion);
         Theme.StyleSecondaryButton(btnRemoveExclusion);
         Theme.SetIcon(btnAddExclusion, AppIcon.Plus);
@@ -1139,7 +1139,7 @@ public class MainForm : Form
             ForeColor = Theme.TextSecondary,
             Margin = new Padding(0, 6, 12, 0),
         };
-        var btnCheckForUpdates = new Button { Text = "Check for Updates" };
+        var btnCheckForUpdates = new Button { Text = "Check for Updates", AutoSize = true };
         Theme.StyleSecondaryButton(btnCheckForUpdates);
         Theme.SetIcon(btnCheckForUpdates, AppIcon.Refresh);
         btnCheckForUpdates.Click += async (_, _) => await CheckForUpdatesAsync();
