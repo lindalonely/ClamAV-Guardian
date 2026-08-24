@@ -10,21 +10,20 @@ name: Release
 #
 # Organization ID: fbb4b0f2-63c3-4576-8eef-8ad86a16dfb8
 # Project slug:            ClamAV_Guardian
-# Signing policy slug:     ClamAV_Guardian  (purpose: Release signing)
-# Artifact config (exe):   pe-file          (Portable Executable file)
-# Artifact config (msi):   msi-file         (TODO: confirm once created — see the
-#                                             "Sign MSI" step below)
+# Signing policy slug:     ClamAV_Guardian    (purpose: Release signing)
+# Artifact config (exe):   initial            (name "Initial version", default config;
+#                                              type: Portable Executable / device driver)
+# Artifact config (msi):   windows-installer  (name "ClamAV Guardian"; type: Windows
+#                                              Installer (.msi))
 #
 # Still required before this workflow can actually succeed:
 #   1. Add repository secrets (Settings > Secrets and variables > Actions):
 #        SIGNPATH_API_TOKEN       - from the SignPath "user details" page
 #        SIGNPATH_ORGANIZATION_ID - fbb4b0f2-63c3-4576-8eef-8ad86a16dfb8
-#   2. Create the "Windows Installer (.msi)" artifact configuration in the
-#      ClamAV_Guardian project and confirm its slug matches 'msi-file' below.
-#   3. Get the "ClamAV Guardian" certificate's CSR signed by a real CA and
+#   2. Get the "ClamAV Guardian" certificate's CSR signed by a real CA and
 #      upload the issued certificate back on its SignPath page — until then its
 #      status stays CSR PENDING and no signing request against it can complete.
-#   4. The release-signing policy requires manual approval (1 approval, from
+#   3. The release-signing policy requires manual approval (1 approval, from
 #      Morning Star) on every signing request — each tagged release will pause
 #      until approved from the SignPath dashboard; the workflow won't finish on
 #      its own. This is intentional (a compromised CI token alone can't get
@@ -107,7 +106,7 @@ jobs:
           organization-id: '${{ secrets.SIGNPATH_ORGANIZATION_ID }}'
           project-slug: 'ClamAV_Guardian'
           signing-policy-slug: 'ClamAV_Guardian'
-          artifact-configuration-slug: 'pe-file'
+          artifact-configuration-slug: 'initial'
           github-artifact-id: '${{ steps.upload-client.outputs.artifact-id }}'
           wait-for-completion: true
           output-artifact-directory: 'signed/client'
@@ -119,7 +118,7 @@ jobs:
           organization-id: '${{ secrets.SIGNPATH_ORGANIZATION_ID }}'
           project-slug: 'ClamAV_Guardian'
           signing-policy-slug: 'ClamAV_Guardian'
-          artifact-configuration-slug: 'pe-file'
+          artifact-configuration-slug: 'initial'
           github-artifact-id: '${{ steps.upload-service.outputs.artifact-id }}'
           wait-for-completion: true
           output-artifact-directory: 'signed/service'
