@@ -74,8 +74,8 @@ jobs:
 
       - name: Install WiX Toolset v5
         run: |
-          dotnet tool install --global wix --version 5.*
-          wix extension add WixToolset.UI.wixext WixToolset.Util.wixext
+          dotnet tool install --global wix --version 5.0.2
+          wix extension add WixToolset.UI.wixext/5.0.2 WixToolset.Util.wixext/5.0.2
 
       - name: Publish client (unsigned)
         run: dotnet publish ClamAVGuardian/ClamAVGuardian.csproj -c Release -r win-x64 -p:Version=${{ steps.version.outputs.version }}
