@@ -9,15 +9,29 @@ name: Release
 # SETUP REQUIRED BEFORE THIS WORKFLOW CAN SUCCEED — see the "Sign *" steps below:
 #
 # 1. Apply for a SignPath.io project (SignPath Foundation offers free code-signing
-#    certificates for qualifying open-source projects — see signpath.io). You'll end
-#    up with: an organization ID, a project, a signing policy, and one "artifact
-#    configuration" per file you want signed.
-# 2. Add these as repository secrets (Settings > Secrets and variables > Actions):
+#    certificates for qualifying open-source projects — see signpath.io).
+#
+# 2. Once approved, you'll have an organization and a project in the SignPath
+#    dashboard. Three identifiers ("slugs") from there feed into this workflow:
+#      - organization-id: shown on your organization's dashboard page.
+#      - project-slug: the identifier you chose (or were given) when creating the
+#        project — visible in the project's dashboard URL and settings.
+#      - signing-policy-slug: every new project comes with default signing
+#        policies (typically "test-signing" and "release-signing") under
+#        Project > Signing Policies — use "release-signing" for real releases.
+#      - artifact-configuration-slug: defines what inside an uploaded artifact
+#        gets signed and how. If you haven't created named ones, just use the
+#        literal string 'default' (all three "Sign *" steps below already do) —
+#        only create separate named configurations if you need different signing
+#        rules per file.
+#
+# 3. Add these as repository secrets (Settings > Secrets and variables > Actions):
 #      SIGNPATH_API_TOKEN       - API token from your SignPath account
 #      SIGNPATH_ORGANIZATION_ID - your SignPath organization ID
-# 3. Replace the placeholder `project-slug`, `signing-policy-slug`, and
-#    `artifact-configuration-slug` values below (marked TODO) with the real slugs
-#    from your SignPath project dashboard.
+#
+# 4. Replace 'clamav-guardian' below (marked TODO) with your actual project-slug.
+#    signing-policy-slug ('release-signing') and artifact-configuration-slug
+#    ('default') should already match a fresh SignPath project's defaults.
 #
 # Until that's done, the build/package steps will still run fine — only the three
 # "Sign *" steps will fail, since they have nothing valid to submit to.
@@ -42,7 +56,7 @@ jobs:
     runs-on: windows-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Determine version
         id: version
@@ -57,7 +71,7 @@ jobs:
           Write-Output "Building version $version"
 
       - name: Setup .NET 8
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v6
         with:
           dotnet-version: '8.0.x'
 
@@ -74,7 +88,7 @@ jobs:
 
       - name: Upload unsigned client exe for signing
         id: upload-client
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: unsigned-client
           path: ClamAVGuardian/bin/Release/net8.0-windows/win-x64/publish/ClamAVGuardian.exe
@@ -82,34 +96,33 @@ jobs:
 
       - name: Upload unsigned service exe for signing
         id: upload-service
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: unsigned-service
           path: ClamAVGuardian.Service/bin/Release/net8.0-windows/win-x64/publish/ClamAVGuardian.Service.exe
           retention-days: 1
 
-      # TODO: replace project-slug / signing-policy-slug / artifact-configuration-slug
-      # with the real values from your SignPath project once it's set up.
+      # TODO: replace 'clamav-guardian' with your real project-slug from SignPath.
       - name: Sign client exe with SignPath
-        uses: signpath/github-action-submit-signing-request@v1
+        uses: signpath/github-action-submit-signing-request@v2
         with:
           api-token: '${{ secrets.SIGNPATH_API_TOKEN }}'
           organization-id: '${{ secrets.SIGNPATH_ORGANIZATION_ID }}'
           project-slug: 'clamav-guardian'
           signing-policy-slug: 'release-signing'
-          artifact-configuration-slug: 'client-exe'
+          artifact-configuration-slug: 'default'
           github-artifact-id: '${{ steps.upload-client.outputs.artifact-id }}'
           wait-for-completion: true
           output-artifact-directory: 'signed/client'
 
       - name: Sign service exe with SignPath
-        uses: signpath/github-action-submit-signing-request@v1
+        uses: signpath/github-action-submit-signing-request@v2
         with:
           api-token: '${{ secrets.SIGNPATH_API_TOKEN }}'
           organization-id: '${{ secrets.SIGNPATH_ORGANIZATION_ID }}'
           project-slug: 'clamav-guardian'
           signing-policy-slug: 'release-signing'
-          artifact-configuration-slug: 'service-exe'
+          artifact-configuration-slug: 'default'
           github-artifact-id: '${{ steps.upload-service.outputs.artifact-id }}'
           wait-for-completion: true
           output-artifact-directory: 'signed/service'
@@ -129,20 +142,20 @@ jobs:
 
       - name: Upload unsigned MSI for signing
         id: upload-msi
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: unsigned-msi
           path: ClamAVGuardianSetup-${{ steps.version.outputs.version }}.msi
           retention-days: 1
 
       - name: Sign MSI with SignPath
-        uses: signpath/github-action-submit-signing-request@v1
+        uses: signpath/github-action-submit-signing-request@v2
         with:
           api-token: '${{ secrets.SIGNPATH_API_TOKEN }}'
           organization-id: '${{ secrets.SIGNPATH_ORGANIZATION_ID }}'
           project-slug: 'clamav-guardian'
           signing-policy-slug: 'release-signing'
-          artifact-configuration-slug: 'installer-msi'
+          artifact-configuration-slug: 'default'
           github-artifact-id: '${{ steps.upload-msi.outputs.artifact-id }}'
           wait-for-completion: true
           output-artifact-directory: 'signed/msi'
@@ -156,7 +169,7 @@ jobs:
 
       - name: Publish GitHub release
         if: github.ref_type == 'tag'
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: |
             signed/msi/ClamAVGuardianSetup-${{ steps.version.outputs.version }}.msi
