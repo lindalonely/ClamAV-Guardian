@@ -145,8 +145,6 @@ jobs:
           path: ClamAVGuardianSetup-${{ steps.version.outputs.version }}.msi
           retention-days: 1
 
-      # TODO: confirm this slug once the "Windows Installer (.msi)" artifact configuration
-      # is created in SignPath (likely 'msi-file', following the 'pe-file' naming pattern).
       - name: Sign MSI with SignPath
         uses: signpath/github-action-submit-signing-request@v2
         with:
@@ -154,7 +152,7 @@ jobs:
           organization-id: '${{ secrets.SIGNPATH_ORGANIZATION_ID }}'
           project-slug: 'ClamAV_Guardian'
           signing-policy-slug: 'ClamAV_Guardian'
-          artifact-configuration-slug: 'msi-file'
+          artifact-configuration-slug: 'windows-installer'
           github-artifact-id: '${{ steps.upload-msi.outputs.artifact-id }}'
           wait-for-completion: true
           output-artifact-directory: 'signed/msi'
