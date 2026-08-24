@@ -1366,13 +1366,15 @@ public class MainForm : Form
     }
 
     /// <summary>
-    /// The MSI's per-machine Desktop shortcut resolves to the shared Public Desktop, which
-    /// isn't visible when OneDrive (or similar) redirects the user's personal Desktop folder.
-    /// Creating it here instead uses the live-resolved path, so it lands wherever the user's
-    /// desktop actually is right now. Checked on every launch against the actual file on disk
-    /// (not a persisted "already done" flag) — that flag previously got stuck true after a
-    /// shortcut vanished for unrelated reasons (OneDrive sync churn, etc.), permanently
-    /// blocking retries even though the icon was gone.
+    /// The MSI's per-machine Desktop shortcut lands on the shared Public Desktop, which
+    /// Explorer normally merges onto every user's visible desktop for free — so on a normal
+    /// machine, creating a second shortcut on the personal Desktop would just be a duplicate
+    /// icon. The one exception is OneDrive (or similar) Known Folder redirection: when it
+    /// takes over the Desktop known folder, Explorer stops merging in the Public Desktop's
+    /// contents, silently hiding the MSI's shortcut. We only create our own copy in that
+    /// specific case (detected by the personal Desktop path resolving under a OneDrive
+    /// folder), and otherwise clean up a stray duplicate left behind by older versions of
+    /// this app that created the fallback shortcut unconditionally.
     /// </summary>
     private Task EnsureDesktopShortcutAsync()
     {
@@ -1380,6 +1382,17 @@ public class MainForm : Form
         {
             var desktopDir = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
             var shortcutPath = Path.Combine(desktopDir, "ClamAV Guardian.lnk");
+            var isRedirectedByOneDrive = desktopDir.Contains("OneDrive", StringComparison.OrdinalIgnoreCase);
+
+            if (!isRedirectedByOneDrive)
+            {
+                if (File.Exists(shortcutPath))
+                {
+                    File.Delete(shortcutPath);
+                    ClientLogger.Info($"Removed duplicate desktop shortcut at '{shortcutPath}' — the Public Desktop shortcut from setup already covers this.");
+                }
+                return Task.CompletedTask;
+            }
 
             if (File.Exists(shortcutPath)) return Task.CompletedTask;
 
@@ -1395,13 +1408,13 @@ public class MainForm : Form
                     shortcut.Description = "Manage ClamAV scanning, updates, and real-time protection";
                     shortcut.Save();
 
-                    ClientLogger.Info($"Created desktop shortcut at '{shortcutPath}'.");
+                    ClientLogger.Info($"Created desktop shortcut at '{shortcutPath}' (OneDrive-redirected Desktop detected; the Public Desktop shortcut wouldn't be visible here).");
                 }
             }
         }
         catch (Exception ex)
         {
-            ClientLogger.Error("Failed to create desktop shortcut", ex);
+            ClientLogger.Error("Failed to reconcile desktop shortcut", ex);
         }
 
         return Task.CompletedTask;
