@@ -4,7 +4,7 @@
   <!-- CI passes the release version via `wix build -d ProductVersion=X.Y.Z.W` (derived from
        the git tag); this default only matters for an ad-hoc local build without that flag. -->
   <?ifndef ProductVersion?>
-  <?define ProductVersion = "1.2.7.0"?>
+  <?define ProductVersion = "1.2.8.0"?>
   <?endif?>
 
   <Package Name="ClamAV Guardian"
@@ -19,7 +19,9 @@
     <MediaTemplate EmbedCab="yes" />
 
     <StandardDirectory Id="ProgramFiles64Folder">
-      <Directory Id="INSTALLFOLDER" Name="ClamAV Guardian" />
+      <Directory Id="INSTALLFOLDER" Name="ClamAV Guardian">
+        <Directory Id="LegalFolder" Name="Legal" />
+      </Directory>
     </StandardDirectory>
 
     <StandardDirectory Id="ProgramMenuFolder">
@@ -28,6 +30,7 @@
 
     <Feature Id="MainFeature" Title="ClamAV Guardian" Level="1">
       <ComponentGroupRef Id="ProductComponents" />
+      <ComponentGroupRef Id="LegalDocsComponents" />
       <ComponentRef Id="StartMenuShortcutComponent" />
       <ComponentRef Id="DesktopShortcutComponent" />
     </Feature>
@@ -57,6 +60,16 @@
                          Stop="both"
                          Remove="uninstall"
                          Wait="yes" />
+      </Component>
+    </ComponentGroup>
+
+    <ComponentGroup Id="LegalDocsComponents" Directory="LegalFolder">
+      <Component Id="LegalDocsComponent" Guid="67afdb9e-4b98-4ce3-9be8-4a145eecb511">
+        <File Id="TermsAndConditionsPdf"
+              Source="..\ClamAVGuardian\bin\Release\net8.0-windows\win-x64\publish\Legal\TermsAndConditions.pdf"
+              KeyPath="yes" />
+        <File Id="PrivacyPolicyPdf"
+              Source="..\ClamAVGuardian\bin\Release\net8.0-windows\win-x64\publish\Legal\PrivacyPolicy.pdf" />
       </Component>
     </ComponentGroup>
 

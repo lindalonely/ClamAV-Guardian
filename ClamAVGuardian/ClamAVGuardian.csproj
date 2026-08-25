@@ -10,7 +10,7 @@
     <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
     <AssemblyName>ClamAVGuardian</AssemblyName>
     <RootNamespace>ClamAVGuardian</RootNamespace>
-    <Version>1.2.7.0</Version>
+    <Version>1.2.8.0</Version>
     <ApplicationIcon>Resources\AppIcon.ico</ApplicationIcon>
 
     <!-- Single-file, self-contained publish settings -->
@@ -28,6 +28,15 @@
 
   <ItemGroup>
     <ProjectReference Include="..\ClamAVGuardian.Core\ClamAVGuardian.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="Legal\TermsAndConditions.pdf">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="Legal\PrivacyPolicy.pdf">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
 
 </Project>

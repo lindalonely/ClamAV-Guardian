@@ -454,7 +454,20 @@ public class MainForm : Form
 
         var navContainer = new Panel { Dock = DockStyle.Top, Height = 42 * 7, BackColor = Theme.SidebarBg };
 
+        var footerPanel = new Panel { Dock = DockStyle.Bottom, Height = 28, BackColor = Theme.SidebarBg };
+        var footerLabel = new Label
+        {
+            Text = "Powered by 7iNDA",
+            Dock = DockStyle.Fill,
+            ForeColor = Theme.SidebarText,
+            BackColor = Color.Transparent,
+            Font = new Font("Segoe UI", 8f),
+            TextAlign = ContentAlignment.MiddleCenter,
+        };
+        footerPanel.Controls.Add(footerLabel);
+
         sidebar.Controls.Add(navContainer);
+        sidebar.Controls.Add(footerPanel);
         sidebar.Controls.Add(titlePanel);
 
         sidebar.Tag = navContainer;
@@ -1050,6 +1063,7 @@ public class MainForm : Form
         root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
 
         root.Controls.Add(PageHeading("Settings"));
 
@@ -1220,11 +1234,37 @@ public class MainForm : Form
 
         updateGroup.Controls.Add(updateLayout);
 
+        var aboutGroup = new RoundedPanel { Height = 90, Dock = DockStyle.Top, Padding = new Padding(16), Margin = new Padding(0, 12, 0, 0) };
+        var aboutLayout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1 };
+        aboutLayout.Controls.Add(new Label { Text = "About", AutoSize = true, Font = Theme.FontBodyBold, Margin = new Padding(0, 0, 0, 8) });
+        var aboutRow = new FlowLayoutPanel { AutoSize = true };
+        aboutRow.Controls.Add(new Label
+        {
+            Text = $"ClamAV Guardian v{currentVersion?.ToString(3)} — Powered by 7iNDA",
+            AutoSize = true,
+            Font = Theme.FontBody,
+            ForeColor = Theme.TextSecondary,
+            Margin = new Padding(0, 6, 16, 0),
+        });
+        var btnTerms = new Button { Text = "Terms && Conditions", AutoSize = true };
+        var btnPrivacy = new Button { Text = "Privacy Policy", AutoSize = true, Margin = new Padding(8, 0, 0, 0) };
+        Theme.StyleSecondaryButton(btnTerms);
+        Theme.StyleSecondaryButton(btnPrivacy);
+        Theme.SetIcon(btnTerms, AppIcon.Document);
+        Theme.SetIcon(btnPrivacy, AppIcon.Document);
+        btnTerms.Click += (_, _) => OpenBundledDocument("TermsAndConditions.pdf");
+        btnPrivacy.Click += (_, _) => OpenBundledDocument("PrivacyPolicy.pdf");
+        aboutRow.Controls.Add(btnTerms);
+        aboutRow.Controls.Add(btnPrivacy);
+        aboutLayout.Controls.Add(aboutRow);
+        aboutGroup.Controls.Add(aboutLayout);
+
         root.Controls.Add(clamAvGroup);
         root.Controls.Add(quarantineGroup);
         root.Controls.Add(generalGroup);
         root.Controls.Add(exclusionsGroup);
         root.Controls.Add(updateGroup);
+        root.Controls.Add(aboutGroup);
 
         page.Controls.Add(root);
         return page;
@@ -1689,6 +1729,18 @@ public class MainForm : Form
         {
             System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo { FileName = dir, UseShellExecute = true });
         }
+    }
+
+    private static void OpenBundledDocument(string fileName)
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "Legal", fileName);
+        if (!File.Exists(path))
+        {
+            MessageBox.Show($"Couldn't find '{fileName}' next to the application.", "ClamAV Guardian", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
+        }
+
+        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo { FileName = path, UseShellExecute = true });
     }
 
     private async Task ToggleRealTimeAsync(bool enable)
