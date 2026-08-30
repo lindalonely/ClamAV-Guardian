@@ -4,7 +4,7 @@
   <!-- CI passes the release version via `wix build -d ProductVersion=X.Y.Z.W` (derived from
        the git tag); this default only matters for an ad-hoc local build without that flag. -->
   <?ifndef ProductVersion?>
-  <?define ProductVersion = "1.2.11.0"?>
+  <?define ProductVersion = "1.2.12.0"?>
   <?endif?>
 
   <Package Name="ClamAV Guardian"
@@ -102,6 +102,25 @@
     <ui:WixUI Id="WixUI_InstallDir" />
     <WixVariable Id="WixUILicenseRtf" Value="License.rtf" />
     <Property Id="WIXUI_INSTALLDIR" Value="INSTALLFOLDER" />
+
+    <!--
+      On a genuine uninstall (not a self-update, which also removes the "old" MSI as part of
+      MajorUpgrade — hence the NOT UPGRADINGPRODUCTCODE guard), also silently uninstalls the
+      separately-installed ClamAV engine, since Guardian downloaded and installed it via its
+      own official MSI in the first place. Looked up by DisplayName rather than a fixed
+      ProductCode, since that code changes with every ClamAV release and can't be hardcoded
+      at Guardian-build time.
+    -->
+    <CustomAction Id="UninstallClamAvEngine"
+                  Directory="INSTALLFOLDER"
+                  ExeCommand="powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -Command &quot;$p = Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*','HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*' -ErrorAction SilentlyContinue | Where-Object { $_.DisplayName -like 'ClamAV*' -and $_.DisplayName -notlike '*Guardian*' -and $_.PSChildName -match '^\{.+\}$' } | Select-Object -First 1; if ($p) { Start-Process msiexec.exe -ArgumentList '/x', $p.PSChildName, '/quiet', '/norestart' -Wait }&quot;"
+                  Execute="deferred"
+                  Impersonate="no"
+                  Return="ignore" />
+
+    <InstallExecuteSequence>
+      <Custom Action="UninstallClamAvEngine" Before="RemoveFiles" Condition="REMOVE=&quot;ALL&quot; AND NOT UPGRADINGPRODUCTCODE" />
+    </InstallExecuteSequence>
 
   </Package>
 </Wix>
