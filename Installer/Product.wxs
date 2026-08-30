@@ -4,7 +4,7 @@
   <!-- CI passes the release version via `wix build -d ProductVersion=X.Y.Z.W` (derived from
        the git tag); this default only matters for an ad-hoc local build without that flag. -->
   <?ifndef ProductVersion?>
-  <?define ProductVersion = "1.2.10.0"?>
+  <?define ProductVersion = "1.2.11.0"?>
   <?endif?>
 
   <Package Name="ClamAV Guardian"

@@ -8,6 +8,14 @@ public enum FreshClamServiceState
     Unknown
 }
 
+public enum ClamdServiceState
+{
+    NotInstalled,
+    Stopped,
+    Running,
+    Unknown
+}
+
 public class UpdateStatus
 {
     public FreshClamServiceState ServiceState { get; set; } = FreshClamServiceState.Unknown;

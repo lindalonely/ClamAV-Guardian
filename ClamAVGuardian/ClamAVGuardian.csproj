@@ -10,7 +10,7 @@
     <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
     <AssemblyName>ClamAVGuardian</AssemblyName>
     <RootNamespace>ClamAVGuardian</RootNamespace>
-    <Version>1.2.10.0</Version>
+    <Version>1.2.11.0</Version>
     <ApplicationIcon>Resources\AppIcon.ico</ApplicationIcon>
 
     <!-- Single-file, self-contained publish settings -->

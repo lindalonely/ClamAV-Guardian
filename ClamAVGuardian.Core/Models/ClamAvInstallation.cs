@@ -12,6 +12,9 @@ public class ClamAvInstallation
     public string FreshClamConfPath => Path.Combine(InstallDir, "freshclam.conf");
     public string ClamdConfPath => Path.Combine(InstallDir, "clamd.conf");
     public string FreshClamConfSamplePath => Path.Combine(InstallDir, "conf_examples", "freshclam.conf.sample");
+    public string ClamdConfSamplePath => Path.Combine(InstallDir, "conf_examples", "clamd.conf.sample");
+    public string ClamdLogPath => Path.Combine(InstallDir, "clamd.log");
+    public string ClamdPidPath => Path.Combine(InstallDir, "clamd.pid");
     public string DatabaseDir => Path.Combine(InstallDir, "database");
 
     public bool HasDatabaseFiles =>

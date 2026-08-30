@@ -32,6 +32,9 @@ public interface IGuardianService
     Task<bool> IsRealTimeProtectionRunningAsync();
     Task<string> GetRealTimeEngineDescriptionAsync();
 
+    Task<ClamdServiceState> GetClamdStateAsync();
+    Task<ClamdActionResult> InstallClamdAsync();
+
     Task<List<QuarantineEntry>> GetQuarantineEntriesAsync();
     Task<bool> RestoreQuarantineEntryAsync(string id);
     Task<bool> DeleteQuarantineEntryAsync(string id);

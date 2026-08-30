@@ -99,6 +99,8 @@ public class MainForm : Form
     private ListBox _lstRealtimeFeed = null!;
     private Label _lblRealtimeFeedEmpty = null!;
     private Label _lblEngine = null!;
+    private Label _lblClamdStatus = null!;
+    private Button _btnInstallClamd = null!;
 
     // Quarantine tab
     private ListView _lvQuarantine = null!;
@@ -351,6 +353,7 @@ public class MainForm : Form
         _lblClamAvStatus.ForeColor = Theme.AccentGreen;
 
         await RefreshUpdateStatusAsync();
+        await RefreshClamdStatusAsync();
 
         _isRealTimeEnabled = _settings.RealTimeProtectionEnabled || await _client.Service.IsRealTimeProtectionRunningAsync();
         if (_isRealTimeEnabled)
@@ -814,7 +817,23 @@ public class MainForm : Form
             _settings.AutoQuarantineOnDetection = _chkAutoQuarantine.Checked;
             await SaveSettingsAsync();
         };
-        _lblEngine = new Label { Text = "Engine: inactive", AutoSize = true, Font = Theme.FontBody, ForeColor = Theme.TextSecondary, Margin = new Padding(0, 0, 0, 8) };
+        _lblEngine = new Label { Text = "Engine: inactive", AutoSize = true, Font = Theme.FontBody, ForeColor = Theme.TextSecondary, Margin = new Padding(0, 0, 0, 4) };
+
+        var clamdRow = new FlowLayoutPanel { AutoSize = true, Margin = new Padding(0, 0, 0, 8) };
+        _lblClamdStatus = new Label
+        {
+            Text = "clamd (fast scanning engine): checking...",
+            AutoSize = true,
+            Font = Theme.FontBody,
+            ForeColor = Theme.TextSecondary,
+            Margin = new Padding(0, 6, 12, 0),
+        };
+        _btnInstallClamd = new Button { Text = "Enable Fast Scanning", AutoSize = true, Visible = false };
+        Theme.StyleSecondaryButton(_btnInstallClamd);
+        Theme.SetIcon(_btnInstallClamd, AppIcon.Download);
+        _btnInstallClamd.Click += async (_, _) => await InstallClamdAsync();
+        clamdRow.Controls.Add(_lblClamdStatus);
+        clamdRow.Controls.Add(_btnInstallClamd);
 
         var folderLabel = SectionHeading("Watched folders");
         var foldersCard = new RoundedPanel { Height = 170, Dock = DockStyle.Top, Padding = new Padding(4) };
@@ -855,6 +874,7 @@ public class MainForm : Form
         leftPanel.Controls.Add(_chkRealTimeEnabled);
         leftPanel.Controls.Add(_chkAutoQuarantine);
         leftPanel.Controls.Add(_lblEngine);
+        leftPanel.Controls.Add(clamdRow);
         leftPanel.Controls.Add(folderLabel);
         leftPanel.Controls.Add(foldersCard);
         leftPanel.Controls.Add(folderButtons);
@@ -1779,6 +1799,61 @@ public class MainForm : Form
 
         _chkRealTimeEnabled.Checked = enable;
         _settings.RealTimeProtectionEnabled = enable;
+    }
+
+    private async Task RefreshClamdStatusAsync()
+    {
+        if (!_client.IsConnected) return;
+
+        var state = await _client.Service.GetClamdStateAsync();
+        switch (state)
+        {
+            case ClamdServiceState.Running:
+                _lblClamdStatus.Text = "clamd (fast scanning engine): running";
+                _lblClamdStatus.ForeColor = Theme.AccentGreen;
+                _btnInstallClamd.Visible = false;
+                break;
+            case ClamdServiceState.Stopped:
+                _lblClamdStatus.Text = "clamd (fast scanning engine): installed but stopped";
+                _lblClamdStatus.ForeColor = Theme.AccentAmber;
+                _btnInstallClamd.Visible = true;
+                _btnInstallClamd.Text = "Start clamd";
+                break;
+            case ClamdServiceState.NotInstalled:
+                _lblClamdStatus.Text = "Real-time protection is scanning file-by-file (slower). Enable clamd for faster scanning.";
+                _lblClamdStatus.ForeColor = Theme.TextSecondary;
+                _btnInstallClamd.Visible = true;
+                _btnInstallClamd.Text = "Enable Fast Scanning";
+                break;
+            default:
+                _lblClamdStatus.Text = "clamd (fast scanning engine): unknown status";
+                _lblClamdStatus.ForeColor = Theme.TextSecondary;
+                _btnInstallClamd.Visible = false;
+                break;
+        }
+    }
+
+    private async Task InstallClamdAsync()
+    {
+        if (!_client.IsConnected)
+        {
+            MessageBox.Show("Not connected to the ClamAV Guardian service.", "ClamAV Guardian");
+            return;
+        }
+
+        _btnInstallClamd.Enabled = false;
+        _lblClamdStatus.Text = "Setting up clamd...";
+        _lblClamdStatus.ForeColor = Theme.TextSecondary;
+
+        var result = await _client.Service.InstallClamdAsync();
+
+        _btnInstallClamd.Enabled = true;
+        await RefreshClamdStatusAsync();
+
+        if (!result.Success)
+        {
+            MessageBox.Show($"Failed to enable fast scanning: {result.Message}", "ClamAV Guardian", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        }
     }
 
     private void OnRealTimeEngineStatus(string message)

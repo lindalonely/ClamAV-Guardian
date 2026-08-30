@@ -17,6 +17,7 @@ public class GuardianContext
     public ScanService? ScanService { get; private set; }
     public UpdateService? UpdateService { get; private set; }
     public RealTimeProtectionService? RealTimeService { get; private set; }
+    public ClamdService? ClamdService { get; private set; }
     public QuarantineService QuarantineService { get; }
 
     public event Action<ScanItem>? ScanItemScanned;
@@ -166,7 +167,32 @@ public class GuardianContext
         RealTimeService.FileScanned += path => RealTimeFileScanned?.Invoke(path);
         RealTimeService.StatusMessage += msg => RealTimeEngineStatus?.Invoke(msg);
 
+        ClamdService = new ClamdService(Install);
+
         AppLogger.Info($"ClamAV located at '{Install.InstallDir}'.");
+    }
+
+    /// <summary>
+    /// Registers and starts clamd as a Windows service, so real-time protection can use the
+    /// resident daemon over TCP instead of spawning a clamscan process per file. If real-time
+    /// protection is already running, restarts it afterward so it picks up clamd immediately
+    /// rather than waiting for the next manual toggle.
+    /// </summary>
+    public async Task<(bool Success, string Message)> InstallClamdAsync()
+    {
+        if (ClamdService == null)
+        {
+            return (false, "ClamAV is not configured yet.");
+        }
+
+        var (success, message) = await ClamdService.InstallAndStartAsync();
+
+        if (success && RealTimeService is { IsRunning: true })
+        {
+            _ = RealTimeService.StartAsync(Settings.RealTimeWatchedFolders);
+        }
+
+        return (success, message);
     }
 
     /// <summary>

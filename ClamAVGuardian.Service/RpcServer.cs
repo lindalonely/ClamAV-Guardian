@@ -122,6 +122,15 @@ public class RpcServer : IGuardianService
     public Task<string> GetRealTimeEngineDescriptionAsync() =>
         Task.FromResult(_context.RealTimeService?.EngineDescription ?? "inactive");
 
+    public Task<ClamdServiceState> GetClamdStateAsync() =>
+        Task.FromResult(_context.ClamdService?.GetState() ?? ClamdServiceState.NotInstalled);
+
+    public async Task<ClamdActionResult> InstallClamdAsync()
+    {
+        var (success, message) = await _context.InstallClamdAsync();
+        return new ClamdActionResult { Success = success, Message = message };
+    }
+
     public Task<List<QuarantineEntry>> GetQuarantineEntriesAsync() =>
         Task.FromResult(_context.QuarantineService.LoadEntries().OrderByDescending(e => e.QuarantinedAtUtc).ToList());
 

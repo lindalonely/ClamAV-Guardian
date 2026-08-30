@@ -27,6 +27,12 @@ public class InstallClamAvResult
     public string Message { get; set; } = string.Empty;
 }
 
+public class ClamdActionResult
+{
+    public bool Success { get; set; }
+    public string Message { get; set; } = string.Empty;
+}
+
 public enum DownloadStage
 {
     Checking,
