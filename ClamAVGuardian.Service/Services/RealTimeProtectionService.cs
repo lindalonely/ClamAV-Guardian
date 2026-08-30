@@ -23,6 +23,15 @@ public class RealTimeProtectionService : IDisposable
     private Timer? _debounceTimer;
     private volatile bool _usingClamd;
 
+    /// <summary>
+    /// Caps how many "clamscan" fallback processes can run at once. Without this, a burst of
+    /// file events (extracting an archive, copying a folder) fires one clamscan process per
+    /// file with no limit — each loading its own full copy of the virus database — and can
+    /// exhaust CPU/memory. Only guards the fallback path; clamd handles its own concurrency
+    /// internally and doesn't need this (it's one resident process, not one per scan).
+    /// </summary>
+    private readonly SemaphoreSlim _clamscanFallbackLimiter = new(1, 1);
+
     public bool IsRunning { get; private set; }
     public bool AutoQuarantine { get; set; } = true;
     public string EngineDescription => _usingClamd ? "clamd (fast)" : "clamscan (fallback)";
@@ -129,7 +138,7 @@ public class RealTimeProtectionService : IDisposable
                 if (!result.Success)
                 {
                     // clamd dropped or errored; fall back for this file.
-                    item = RunClamscanSingleFile(path);
+                    item = await RunClamscanSingleFileThrottledAsync(path);
                 }
                 else
                 {
@@ -140,7 +149,7 @@ public class RealTimeProtectionService : IDisposable
             }
             else
             {
-                item = RunClamscanSingleFile(path);
+                item = await RunClamscanSingleFileThrottledAsync(path);
             }
 
             FileScanned?.Invoke(path);
@@ -184,7 +193,20 @@ public class RealTimeProtectionService : IDisposable
         return false;
     }
 
-    private ScanItem RunClamscanSingleFile(string path)
+    private async Task<ScanItem> RunClamscanSingleFileThrottledAsync(string path)
+    {
+        await _clamscanFallbackLimiter.WaitAsync();
+        try
+        {
+            return await RunClamscanSingleFileAsync(path);
+        }
+        finally
+        {
+            _clamscanFallbackLimiter.Release();
+        }
+    }
+
+    private async Task<ScanItem> RunClamscanSingleFileAsync(string path)
     {
         try
         {
@@ -200,8 +222,17 @@ public class RealTimeProtectionService : IDisposable
             using var process = Process.Start(psi);
             if (process == null) return new ScanItem { Path = path, Status = ScanStatus.Error, ErrorMessage = "Failed to start clamscan" };
 
-            var output = process.StandardOutput.ReadToEnd().Trim();
-            process.WaitForExit(30000);
+            var output = (await process.StandardOutput.ReadToEndAsync()).Trim();
+
+            using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+            try
+            {
+                await process.WaitForExitAsync(timeoutCts.Token);
+            }
+            catch (OperationCanceledException)
+            {
+                try { process.Kill(entireProcessTree: true); } catch { /* best effort */ }
+            }
 
             var match = Regex.Match(output, @"^(?<path>.+): (?<status>.+)$");
             if (!match.Success) return new ScanItem { Path = path, Status = ScanStatus.Clean };
@@ -223,5 +254,6 @@ public class RealTimeProtectionService : IDisposable
     public void Dispose()
     {
         Stop();
+        _clamscanFallbackLimiter.Dispose();
     }
 }
