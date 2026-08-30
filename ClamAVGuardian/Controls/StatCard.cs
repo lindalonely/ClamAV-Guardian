@@ -65,7 +65,7 @@ public class StatCard : RoundedPanel
     public StatCard()
     {
         Padding = new Padding(16, 14, 16, 12);
-        Size = new Size(220, 110);
+        Size = new Size(250, 110);
 
         _accentBar = new Panel { Dock = DockStyle.Left, Width = 4, BackColor = Theme.AccentBlue };
 
@@ -115,7 +115,7 @@ public class StatCard : RoundedPanel
             Visible = false,
         };
 
-        var contentPanel = new Panel { Dock = DockStyle.Fill, Padding = new Padding(12, 0, 26, 0) };
+        var contentPanel = new Panel { Dock = DockStyle.Fill, Padding = new Padding(12, 0, 20, 0) };
         contentPanel.Controls.Add(_subtitleLabel);
         contentPanel.Controls.Add(_valueLabel);
         contentPanel.Controls.Add(_titleLabel);

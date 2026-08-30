@@ -28,7 +28,7 @@ public static class Theme
     public static Font FontSubheading => new("Segoe UI Semibold", 11f);
     public static Font FontBody => new("Segoe UI", 9.5f);
     public static Font FontBodyBold => new("Segoe UI Semibold", 9.5f);
-    public static Font FontStatValue => new("Segoe UI Semibold", 20f);
+    public static Font FontStatValue => new("Segoe UI Semibold", 16f);
     public static Font FontStatLabel => new("Segoe UI", 9f);
     public static Font FontNav => new("Segoe UI", 10f);
     public static Font FontMono => new("Consolas", 9f);

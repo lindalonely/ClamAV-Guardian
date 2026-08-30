@@ -486,7 +486,10 @@ public class MainForm : Form
         var navButton = new SidebarNavButton(title, icon);
         navButton.Activated += (_, _) => SelectPage(navButton);
         navContainer.Controls.Add(navButton);
-        navContainer.Controls.SetChildIndex(navButton, navContainer.Controls.Count - 1);
+        // For Dock=Top siblings, the LOWEST z-order index sits closest to the docked edge,
+        // so each newly-added button must go to index 0 to land below (not above) the ones
+        // already there — the reverse of what "append at the end" intuitively suggests.
+        navContainer.Controls.SetChildIndex(navButton, 0);
 
         _navButtons.Add(navButton);
         _pagesByNav[navButton] = page;
@@ -964,7 +967,7 @@ public class MainForm : Form
         _cardLastUpdateUpd = NewCard("Last Update", "Never", Theme.AccentBlue, AppIcon.Clock);
         foreach (var card in new[] { _cardServiceState, _cardDbVersionUpd, _cardLastUpdateUpd })
         {
-            card.Size = new Size(220, 110);
+            card.Size = new Size(250, 110);
             card.Margin = new Padding(0, 0, 16, 12);
             statsFlow.Controls.Add(card);
         }
