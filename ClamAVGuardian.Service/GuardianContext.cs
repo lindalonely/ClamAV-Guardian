@@ -154,7 +154,9 @@ public class GuardianContext
         ScanService.ItemScanned += item => ScanItemScanned?.Invoke(ApplyAutoQuarantineIfNeeded(item));
         ScanService.StatusMessage += msg => ScanStatusMessage?.Invoke(msg);
 
-        UpdateService = new UpdateService(Install);
+        ClamdService = new ClamdService(Install);
+
+        UpdateService = new UpdateService(Install, ClamdService);
         UpdateService.LogLine += line => UpdateLogLine?.Invoke(line);
         var (configured, message) = UpdateService.EnsureConfigured();
         if (!configured) AppLogger.Warn($"freshclam configuration issue: {message}");
@@ -166,8 +168,6 @@ public class GuardianContext
         RealTimeService.ThreatDetected += (item, quarantined) => RealTimeThreatDetected?.Invoke(item, quarantined);
         RealTimeService.FileScanned += path => RealTimeFileScanned?.Invoke(path);
         RealTimeService.StatusMessage += msg => RealTimeEngineStatus?.Invoke(msg);
-
-        ClamdService = new ClamdService(Install);
 
         AppLogger.Info($"ClamAV located at '{Install.InstallDir}'.");
     }

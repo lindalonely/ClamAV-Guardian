@@ -16,14 +16,16 @@ namespace ClamAVGuardian.Services;
 public class UpdateService : IDisposable
 {
     private readonly ClamAvInstallation _install;
+    private readonly ClamdService? _clamdService;
     private Timer? _fallbackTimer;
 
     public event Action<UpdateStatus>? StatusChanged;
     public event Action<string>? LogLine;
 
-    public UpdateService(ClamAvInstallation install)
+    public UpdateService(ClamAvInstallation install, ClamdService? clamdService = null)
     {
         _install = install;
+        _clamdService = clamdService;
     }
 
     public ServiceController? FindFreshClamService()
@@ -188,6 +190,16 @@ public class UpdateService : IDisposable
             LogLine?.Invoke(e.Data);
         };
 
+        // Windows won't let freshclam delete/replace daily.cld while clamd has it open (an
+        // exclusive lock, unlike POSIX where an open file can still be unlinked) — stop clamd
+        // for the duration of the update and restart it right after, regardless of outcome.
+        var wasClamdRunning = _clamdService?.GetState() == ClamdServiceState.Running;
+        if (wasClamdRunning)
+        {
+            LogLine?.Invoke("Stopping clamd temporarily so the database files can be replaced...");
+            _clamdService!.Stop();
+        }
+
         try
         {
             process.Start();
@@ -208,6 +220,14 @@ public class UpdateService : IDisposable
         catch (Exception ex)
         {
             return (false, ex.Message);
+        }
+        finally
+        {
+            if (wasClamdRunning)
+            {
+                LogLine?.Invoke("Restarting clamd...");
+                _clamdService!.Start();
+            }
         }
     }
 

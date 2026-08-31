@@ -56,6 +56,53 @@ public class ClamdService
     }
 
     /// <summary>
+    /// Windows won't let freshclam delete/replace daily.cld while clamd has it open, so an
+    /// update must stop clamd first and restart it after — unlike POSIX, an open file can't
+    /// be unlinked out from under the holding process.
+    /// </summary>
+    public bool Stop()
+    {
+        using var svc = FindService();
+        if (svc == null) return false;
+        try
+        {
+            svc.Refresh();
+            if (svc.Status != ServiceControllerStatus.Stopped)
+            {
+                svc.Stop();
+                svc.WaitForStatus(ServiceControllerStatus.Stopped, TimeSpan.FromSeconds(15));
+            }
+            return true;
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Error("Failed to stop clamd service", ex);
+            return false;
+        }
+    }
+
+    public bool Start()
+    {
+        using var svc = FindService();
+        if (svc == null) return false;
+        try
+        {
+            svc.Refresh();
+            if (svc.Status != ServiceControllerStatus.Running)
+            {
+                svc.Start();
+                svc.WaitForStatus(ServiceControllerStatus.Running, TimeSpan.FromSeconds(15));
+            }
+            return true;
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Error("Failed to start clamd service", ex);
+            return false;
+        }
+    }
+
+    /// <summary>
     /// clamd.conf.sample ships entirely commented out (every directive prefixed by a line
     /// that just says "Example"), so clamd refuses to start until a real config exists. This
     /// provisions one wired to the TCP socket ClamdClient expects, with zero manual setup.
