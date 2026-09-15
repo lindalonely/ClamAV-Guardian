@@ -147,6 +147,33 @@ public class MainForm : Form
         FormClosing += MainForm_FormClosing;
     }
 
+    private bool _hasShownOnce;
+
+    /// <summary>
+    /// Application.Run(new MainForm()) shows the form immediately at startup, before the
+    /// async Load handler has connected to the service, fetched settings, and decided
+    /// whether StartMinimized is on — so without this, a "start minimized" launch still
+    /// flashes the window on screen for a moment before InitializeAsync() gets around to
+    /// calling Hide(). The fix is the standard trick for this: let the very first show
+    /// request through just long enough to fire OnLoad (Form only calls it once, on the
+    /// value=true transition), then immediately flip back to hidden in the same call —
+    /// both happen synchronously with no message-loop iteration in between, so the window
+    /// never actually gets a chance to paint. RefreshFromServiceAsync is responsible for
+    /// explicitly showing the window afterward if StartMinimized turns out to be off.
+    /// </summary>
+    protected override void SetVisibleCore(bool value)
+    {
+        if (!_hasShownOnce && value)
+        {
+            _hasShownOnce = true;
+            base.SetVisibleCore(true);
+            base.SetVisibleCore(false);
+            return;
+        }
+
+        base.SetVisibleCore(value);
+    }
+
     /// <summary>
     /// A second launch attempt (e.g. clicking the desktop/Start Menu icon while already
     /// auto-started and hidden in the tray) signals this event instead of showing a "already
@@ -331,9 +358,13 @@ public class MainForm : Form
         _txtQuarantinePath.Text = _settings.QuarantinePath;
         await EnsureDesktopShortcutAsync();
 
-        if (_settings.StartMinimized && WindowState != FormWindowState.Minimized)
+        if (_settings.StartMinimized)
         {
-            Hide();
+            // Already hidden from startup — see SetVisibleCore. Nothing to do.
+        }
+        else
+        {
+            ShowAndFocus();
         }
 
         _install = await _client.Service.GetCurrentInstallationAsync();
